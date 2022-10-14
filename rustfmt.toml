@@ -1,0 +1,16 @@
+edition = "2021"
+
+blank_lines_lower_bound = 0
+blank_lines_upper_bound = 2
+
+comment_width = 80
+wrap_comments = true
+
+reorder_imports = true
+imports_layout = "HorizontalVertical"
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+
+match_block_trailing_comma = true
+trailing_comma = "Vertical"
+trailing_semicolon = true
