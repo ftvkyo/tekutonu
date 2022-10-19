@@ -124,6 +124,32 @@ fn choose_device_and_queue(
     (device, queues.next().unwrap())
 }
 
+mod vs {
+    vulkano_shaders::shader! {
+        ty: "vertex",
+        src: "
+            #version 450
+            layout(location = 0) in vec2 position;
+            void main() {
+                gl_Position = vec4(position, 0.0, 1.0);
+            }
+        "
+    }
+}
+
+mod fs {
+    vulkano_shaders::shader! {
+        ty: "fragment",
+        src: "
+            #version 450
+            layout(location = 0) out vec4 f_color;
+                void main() {
+                f_color = vec4(1.0, 0.0, 0.0, 1.0);
+            }
+        "
+    }
+}
+
 fn create_swapchain_and_images(device: Arc<Device>, surface: Arc<Surface<Window>>) -> (Arc<Swapchain<Window>>, Vec<Arc<SwapchainImage<Window>>>) {
     // We will only be allowed to request capabilities that are supported by the
     // surface
@@ -222,33 +248,6 @@ fn main() {
     .unwrap();
 
     // Creating shaders
-
-    mod vs {
-        vulkano_shaders::shader! {
-            ty: "vertex",
-            src: "
-                #version 450
-                layout(location = 0) in vec2 position;
-                void main() {
-                    gl_Position = vec4(position, 0.0, 1.0);
-                }
-            "
-        }
-    }
-
-    mod fs {
-        vulkano_shaders::shader! {
-            ty: "fragment",
-            src: "
-                #version 450
-                layout(location = 0) out vec4 f_color;
-                    void main() {
-                    f_color = vec4(1.0, 0.0, 0.0, 1.0);
-                }
-            "
-        }
-    }
-
     let vs = vs::load(device.clone()).unwrap();
     let fs = fs::load(device.clone()).unwrap();
 
