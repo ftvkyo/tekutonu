@@ -1,7 +1,46 @@
 use std::sync::Arc;
 
 use bytemuck::{Pod, Zeroable};
-use vulkano::{VulkanLibrary, sync::{self, FlushError, GpuFuture}, device::{DeviceExtensions, physical::PhysicalDeviceType, DeviceCreateInfo, Device, QueueCreateInfo}, instance::{Instance, InstanceCreateInfo}, swapchain::{Swapchain, SwapchainCreateInfo, SwapchainCreationError, acquire_next_image, AcquireError, PresentInfo}, image::{ImageUsage, SwapchainImage, view::ImageView, ImageAccess}, impl_vertex, buffer::{CpuAccessibleBuffer, BufferUsage, TypedBufferAccess}, pipeline::{GraphicsPipeline, graphics::{vertex_input::BuffersDefinition, input_assembly::InputAssemblyState, viewport::{ViewportState, Viewport}}}, render_pass::{Subpass, RenderPass, Framebuffer, FramebufferCreateInfo}, command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassContents}};
+use vulkano::{
+    buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
+    command_buffer::{
+        AutoCommandBufferBuilder,
+        CommandBufferUsage,
+        RenderPassBeginInfo,
+        SubpassContents,
+    },
+    device::{
+        physical::PhysicalDeviceType,
+        Device,
+        DeviceCreateInfo,
+        DeviceExtensions,
+        Queue,
+        QueueCreateInfo,
+    },
+    image::{view::ImageView, ImageAccess, ImageUsage, SwapchainImage},
+    impl_vertex,
+    instance::{Instance, InstanceCreateInfo},
+    pipeline::{
+        graphics::{
+            input_assembly::InputAssemblyState,
+            vertex_input::BuffersDefinition,
+            viewport::{Viewport, ViewportState},
+        },
+        GraphicsPipeline,
+    },
+    render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass},
+    swapchain::{
+        acquire_next_image,
+        AcquireError,
+        PresentInfo,
+        Surface,
+        Swapchain,
+        SwapchainCreateInfo,
+        SwapchainCreationError,
+    },
+    sync::{self, FlushError, GpuFuture},
+    VulkanLibrary,
+};
 use vulkano_win::VkSurfaceBuild;
 use winit::{
     event::{Event, WindowEvent},
@@ -9,28 +48,27 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-fn main() {
+fn make_instance() -> Arc<Instance> {
     let library = VulkanLibrary::new().unwrap();
     let required_extensions = vulkano_win::required_extensions(&library);
 
-    let instance = Instance::new(
+    Instance::new(
         library,
         InstanceCreateInfo {
             enabled_extensions: required_extensions,
-            // Enable enumerating devices that use non-conformant vulkan implementations. (ex. MoltenVK)
+            // Enable enumerating devices that use non-conformant vulkan implementations.
             enumerate_portability: true,
             ..Default::default()
         },
     )
-    .unwrap();
+    .unwrap()
+}
 
-    let event_loop = EventLoop::new();
-    let surface = WindowBuilder::new()
-        .build_vk_surface(&event_loop, instance.clone())
-        .unwrap();
-
+fn choose_device_and_queue(
+    instance: Arc<Instance>,
+    surface: Arc<Surface<Window>>,
+) -> (Arc<Device>, Arc<Queue>) {
     // TODO: check out what other extensions are there
-
     let device_extensions = DeviceExtensions {
         khr_swapchain: true,
         ..DeviceExtensions::empty()
@@ -39,9 +77,7 @@ fn main() {
     let (physical_device, queue_family_index) = instance
         .enumerate_physical_devices()
         .unwrap()
-        .filter(|pd| {
-            pd.supported_extensions().contains(&device_extensions)
-        })
+        .filter(|pd| pd.supported_extensions().contains(&device_extensions))
         .filter_map(|pd| {
             // TODO: maybe use separate queues for data transfer and graphics operations.
             pd.queue_family_properties()
@@ -55,15 +91,13 @@ fn main() {
                 })
                 .map(|i| (pd, i as u32))
         })
-        .min_by_key(|(pd, _)| {
-            match pd.properties().device_type {
-                PhysicalDeviceType::DiscreteGpu => 0,
-                PhysicalDeviceType::IntegratedGpu => 1,
-                PhysicalDeviceType::VirtualGpu => 2,
-                PhysicalDeviceType::Cpu => 3,
-                PhysicalDeviceType::Other => 4,
-                _ => 5,
-            }
+        .min_by_key(|(pd, _)| match pd.properties().device_type {
+            PhysicalDeviceType::DiscreteGpu => 0,
+            PhysicalDeviceType::IntegratedGpu => 1,
+            PhysicalDeviceType::VirtualGpu => 2,
+            PhysicalDeviceType::Cpu => 3,
+            PhysicalDeviceType::Other => 4,
+            _ => 5,
         })
         .expect("No suitable physical device found");
 
@@ -87,12 +121,23 @@ fn main() {
     )
     .unwrap();
 
-    // Only one queue requested
-    let queue = queues.next().unwrap();
+    (device, queues.next().unwrap())
+}
+
+fn main() {
+    let instance = make_instance();
+
+    let event_loop = EventLoop::new();
+    let surface = WindowBuilder::new()
+        .build_vk_surface(&event_loop, instance.clone())
+        .unwrap();
+
+    let (device, queue) = choose_device_and_queue(instance.clone(), surface.clone());
 
     // Allocating color (image) buffers through creating a swapchain.
     let (mut swapchain, images) = {
-        // We will only be allowed to request capabilities that are supported by the surface
+        // We will only be allowed to request capabilities that are supported by the
+        // surface
         let surface_capabilities = device
             .physical_device()
             .surface_capabilities(&surface, Default::default())
@@ -129,7 +174,8 @@ fn main() {
                     ..ImageUsage::empty()
                 },
 
-                // TODO: read more. maybe this means transparent window and compositing with other windows?
+                // TODO: read more. maybe this means transparent window and compositing with other
+                // windows?
                 composite_alpha: surface_capabilities
                     .supported_composite_alpha
                     .iter()
@@ -204,7 +250,8 @@ fn main() {
     let vs = vs::load(device.clone()).unwrap();
     let fs = fs::load(device.clone()).unwrap();
 
-    // Describe where the output of the graphics pipeline will go by creating a RenderPass.
+    // Describe where the output of the graphics pipeline will go by creating a
+    // RenderPass.
     let render_pass = vulkano::single_pass_renderpass!(
         device.clone(),
         // TODO: read about attachments
@@ -245,23 +292,24 @@ fn main() {
         .build(device.clone())
         .unwrap();
 
-    // Dynamic viewports allow us to recreate just the viewport when the window is resized
-    // Otherwise we would have to recreate the whole pipeline.
+    // Dynamic viewports allow us to recreate just the viewport when the window is
+    // resized Otherwise we would have to recreate the whole pipeline.
     let mut viewport = Viewport {
         origin: [0.0, 0.0],
         dimensions: [0.0, 0.0],
         depth_range: 0.0..1.0,
     };
 
-    // render_pass only specifies the layout of framebuffers, we need to actually create them.
-    // We should create a separate framebuffer for every image.
+    // render_pass only specifies the layout of framebuffers, we need to actually
+    // create them. We should create a separate framebuffer for every image.
     let mut framebuffers = window_size_dependent_setup(&images, render_pass.clone(), &mut viewport);
 
     // End of initialization.
 
     let mut should_recreate_swapchain = false;
 
-    // Store the submission of the previous frame to avoid blocking on GpuFutures to wait.
+    // Store the submission of the previous frame to avoid blocking on GpuFutures to
+    // wait.
     let mut previous_frame_end = Some(sync::now(device.clone()).boxed());
 
     event_loop.run(move |event, _, control_flow| {
@@ -271,13 +319,13 @@ fn main() {
                 ..
             } => {
                 *control_flow = ControlFlow::Exit;
-            }
+            },
             Event::WindowEvent {
                 event: WindowEvent::Resized(_),
                 ..
             } => {
                 should_recreate_swapchain = true;
-            }
+            },
             Event::RedrawEventsCleared => {
                 // Do not draw frame when screen dimensions are zero.
                 // On Windows, this can occur from minimizing the application.
@@ -286,14 +334,16 @@ fn main() {
                     return;
                 }
 
-                // It is important to call this function from time to time, otherwise resources will keep
-                // accumulating and you will eventually reach an out of memory error.
-                // Calling this function polls various fences in order to determine what the GPU has
-                // already processed, and frees the resources that are no longer needed.
+                // It is important to call this function from time to time, otherwise resources
+                // will keep accumulating and you will eventually reach an out
+                // of memory error. Calling this function polls various fences
+                // in order to determine what the GPU has already processed, and
+                // frees the resources that are no longer needed.
                 previous_frame_end.as_mut().unwrap().cleanup_finished();
 
-                // Whenever the window resizes we need to recreate everything dependent on the window size.
-                // In this example that includes the swapchain, the framebuffers and the dynamic state viewport.
+                // Whenever the window resizes we need to recreate everything dependent on the
+                // window size. In this example that includes the swapchain, the
+                // framebuffers and the dynamic state viewport.
                 if should_recreate_swapchain {
                     // Use the new dimensions of the window.
 
@@ -303,8 +353,9 @@ fn main() {
                             ..swapchain.create_info()
                         }) {
                             Ok(r) => r,
-                            // This error tends to happen when the user is manually resizing the window.
-                            // Simply restarting the loop is the easiest way to fix this issue.
+                            // This error tends to happen when the user is manually resizing the
+                            // window. Simply restarting the loop is the
+                            // easiest way to fix this issue.
                             Err(SwapchainCreationError::ImageExtentNotSupported { .. }) => return,
                             Err(e) => panic!("Failed to recreate swapchain: {:?}", e),
                         };
@@ -320,39 +371,44 @@ fn main() {
                     should_recreate_swapchain = false;
                 }
 
-                // Before we can draw on the output, we have to *acquire* an image from the swapchain. If
-                // no image is available (which happens if you submit draw commands too quickly), then the
-                // function will block.
-                // This operation returns the index of the image that we are allowed to draw upon.
+                // Before we can draw on the output, we have to *acquire* an image from the
+                // swapchain. If no image is available (which happens if you
+                // submit draw commands too quickly), then the function will
+                // block. This operation returns the index of the image that we
+                // are allowed to draw upon.
                 //
-                // This function can block if no image is available. The parameter is an optional timeout
-                // after which the function call will return an error.
+                // This function can block if no image is available. The parameter is an
+                // optional timeout after which the function call will return an
+                // error.
                 let (image_num, suboptimal, acquire_future) =
                     match acquire_next_image(swapchain.clone(), None) {
                         Ok(r) => r,
                         Err(AcquireError::OutOfDate) => {
                             should_recreate_swapchain = true;
                             return;
-                        }
+                        },
                         Err(e) => panic!("Failed to acquire next image: {:?}", e),
                     };
 
-                // acquire_next_image can be successful, but suboptimal. This means that the swapchain image
-                // will still work, but it may not display correctly. With some drivers this can be when
-                // the window resizes, but it may not cause the swapchain to become out of date.
+                // acquire_next_image can be successful, but suboptimal. This means that the
+                // swapchain image will still work, but it may not display
+                // correctly. With some drivers this can be when the window
+                // resizes, but it may not cause the swapchain to become out of date.
                 if suboptimal {
                     should_recreate_swapchain = true;
                 }
 
-                // In order to draw, we have to build a *command buffer*. The command buffer object holds
-                // the list of commands that are going to be executed.
+                // In order to draw, we have to build a *command buffer*. The command buffer
+                // object holds the list of commands that are going to be
+                // executed.
                 //
                 // Building a command buffer is an expensive operation (usually a few hundred
-                // microseconds), but it is known to be a hot path in the driver and is expected to be
-                // optimized.
+                // microseconds), but it is known to be a hot path in the driver and is expected
+                // to be optimized.
                 //
-                // Note that we have to pass a queue family when we create the command buffer. The command
-                // buffer will only be executable on that given queue family.
+                // Note that we have to pass a queue family when we create the command buffer.
+                // The command buffer will only be executable on that given
+                // queue family.
                 let mut builder = AutoCommandBufferBuilder::primary(
                     device.clone(),
                     queue.queue_family_index(),
@@ -379,7 +435,8 @@ fn main() {
                         SubpassContents::Inline,
                     )
                     .unwrap()
-                    // We are now inside the first subpass of the render pass. We add a draw command.
+                    // We are now inside the first subpass of the render pass. We add a draw
+                    // command.
                     //
                     // The last two parameters contain the list of resources to pass to the shaders.
                     // Since we used an `EmptyPipeline` object, the objects have to be `()`.
@@ -402,12 +459,14 @@ fn main() {
                     .join(acquire_future)
                     .then_execute(queue.clone(), command_buffer)
                     .unwrap()
-                    // The color output is now expected to contain our triangle. But in order to show it on
-                    // the screen, we have to *present* the image by calling `present`.
+                    // The color output is now expected to contain our triangle. But in order to
+                    // show it on the screen, we have to *present* the image by
+                    // calling `present`.
                     //
-                    // This function does not actually present the image immediately. Instead it submits a
-                    // present command at the end of the queue. This means that it will only be presented once
-                    // the GPU has finished executing the command buffer that draws the triangle.
+                    // This function does not actually present the image immediately. Instead it
+                    // submits a present command at the end of the queue. This
+                    // means that it will only be presented once the GPU has
+                    // finished executing the command buffer that draws the triangle.
                     .then_swapchain_present(
                         queue.clone(),
                         PresentInfo {
@@ -420,23 +479,24 @@ fn main() {
                 match future {
                     Ok(future) => {
                         previous_frame_end = Some(future.boxed());
-                    }
+                    },
                     Err(FlushError::OutOfDate) => {
                         should_recreate_swapchain = true;
                         previous_frame_end = Some(sync::now(device.clone()).boxed());
-                    }
+                    },
                     Err(e) => {
                         println!("Failed to flush future: {:?}", e);
                         previous_frame_end = Some(sync::now(device.clone()).boxed());
-                    }
+                    },
                 }
-            }
+            },
             _ => (),
         }
     });
 }
 
-/// This method is called once during initialization, then again whenever the window is resized
+/// This method is called once during initialization, then again whenever the
+/// window is resized
 fn window_size_dependent_setup(
     images: &[Arc<SwapchainImage<Window>>],
     render_pass: Arc<RenderPass>,
