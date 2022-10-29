@@ -1,10 +1,12 @@
 use tekutonu::rendering::{instance::make_instance, renderer::GameRenderer};
+use winit::event_loop::EventLoop;
 
 
 fn main() {
     let instance = make_instance();
 
-    let renderer = GameRenderer::new(instance);
+    let event_loop = EventLoop::new();
+    let renderer = GameRenderer::new(instance, &event_loop);
 
-    renderer.render();
+    renderer.render(event_loop);
 }
