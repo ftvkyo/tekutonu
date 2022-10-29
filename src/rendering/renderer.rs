@@ -71,7 +71,9 @@ impl GameRenderer {
         let pipeline = super::pipeline::make_pipeline(device.clone(), render_pass.clone(), vs, fs);
 
         // Dynamic viewports allow us to recreate just the viewport when the window is
-        // resized Otherwise we would have to recreate the whole pipeline.
+        // resized.
+        // Otherwise we would have to recreate the whole pipeline.
+        // However, not using a dynamic viewport could allow the driver to optimize some things at the cost of slower resizes.
         let mut viewport = Viewport {
             origin: [0.0, 0.0],
             dimensions: [0.0, 0.0],
@@ -101,6 +103,7 @@ impl GameRenderer {
         &mut self,
         image_num: usize,
         vertex_buffer: Arc<CpuAccessibleBuffer<[Vertex]>>,
+        index_buffer: Arc<CpuAccessibleBuffer<[u16]>>,
     ) -> PrimaryAutoCommandBuffer {
         let mut builder = AutoCommandBufferBuilder::primary(
             self.device.clone(),
@@ -124,7 +127,8 @@ impl GameRenderer {
             .set_viewport(0, [self.viewport.clone()])
             .bind_pipeline_graphics(self.pipeline.clone())
             .bind_vertex_buffers(0, vertex_buffer.clone())
-            .draw(vertex_buffer.len() as u32, 1, 0, 0)
+            .bind_index_buffer(index_buffer.clone())
+            .draw_indexed(index_buffer.len() as u32, 1, 0, 0, 0)
             .unwrap()
             .end_render_pass()
             .unwrap();
@@ -136,8 +140,9 @@ impl GameRenderer {
     }
 
     pub fn render(mut self, event_loop: EventLoop<()>) {
-        // Describe our triangle
+        // Describe our square
         let vertex_buffer = super::make_vertex_buffer(self.device.clone());
+        let index_buffer = super::make_index_buffer(self.device.clone());
 
         let mut should_recreate_swapchain = false;
 
@@ -216,7 +221,7 @@ impl GameRenderer {
                     }
 
                     let command_buffer =
-                        self.build_command_buffer(image_num, vertex_buffer.clone());
+                        self.build_command_buffer(image_num, vertex_buffer.clone(), index_buffer.clone());
 
                     let future = previous_frame_end
                         .take()

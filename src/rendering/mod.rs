@@ -29,13 +29,16 @@ impl_vertex!(Vertex, position);
 pub fn make_vertex_buffer(device: Arc<Device>) -> Arc<CpuAccessibleBuffer<[Vertex]>> {
     let vertices = [
         Vertex {
-            position: [-0.5, -0.25],
+            position: [-0.5, -0.5],
         },
         Vertex {
-            position: [0.0, 0.5],
+            position: [-0.5, 0.5],
         },
         Vertex {
-            position: [0.25, -0.1],
+            position: [0.5, 0.5],
+        },
+        Vertex {
+            position: [0.5, -0.5],
         },
     ];
 
@@ -47,6 +50,21 @@ pub fn make_vertex_buffer(device: Arc<Device>) -> Arc<CpuAccessibleBuffer<[Verte
         },
         false,
         vertices,
+    )
+    .unwrap()
+}
+
+pub fn make_index_buffer(device: Arc<Device>) -> Arc<CpuAccessibleBuffer<[u16]>> {
+    let indices = [0, 1, 2, 0, 2, 3];
+
+    CpuAccessibleBuffer::from_iter(
+        device,
+        BufferUsage {
+            index_buffer: true,
+            ..BufferUsage::empty()
+        },
+        false,
+        indices,
     )
     .unwrap()
 }
