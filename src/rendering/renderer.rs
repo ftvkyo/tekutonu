@@ -1,5 +1,6 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
+use cgmath::{Matrix3, Rad, Point3, Vector3, Matrix4};
 use vulkano::{
     buffer::{CpuAccessibleBuffer, TypedBufferAccess},
     command_buffer::{
@@ -11,7 +12,7 @@ use vulkano::{
     },
     device::{Device, Queue},
     instance::Instance,
-    pipeline::{graphics::viewport::Viewport, GraphicsPipeline},
+    pipeline::{graphics::viewport::Viewport, GraphicsPipeline, Pipeline, PipelineBindPoint},
     render_pass::{Framebuffer, RenderPass},
     swapchain::{
         acquire_next_image,
@@ -22,7 +23,7 @@ use vulkano::{
         SwapchainCreateInfo,
         SwapchainCreationError,
     },
-    sync::{self, FlushError, GpuFuture},
+    sync::{self, FlushError, GpuFuture}, descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
 };
 use winit::{
     event::{Event, WindowEvent},
@@ -102,6 +103,7 @@ impl GameRenderer {
     fn build_command_buffer(
         &mut self,
         image_num: usize,
+        descriptor_set: Arc<PersistentDescriptorSet>,
         vertex_buffer: Arc<CpuAccessibleBuffer<[Vertex]>>,
         index_buffer: Arc<CpuAccessibleBuffer<[u16]>>,
     ) -> PrimaryAutoCommandBuffer {
@@ -126,6 +128,12 @@ impl GameRenderer {
             .unwrap()
             .set_viewport(0, [self.viewport.clone()])
             .bind_pipeline_graphics(self.pipeline.clone())
+            .bind_descriptor_sets(
+                PipelineBindPoint::Graphics,
+                self.pipeline.layout().clone(),
+                0,
+                descriptor_set,
+            )
             .bind_vertex_buffers(0, vertex_buffer.clone())
             .bind_index_buffer(index_buffer.clone())
             .draw_indexed(index_buffer.len() as u32, 1, 0, 0, 0)
@@ -143,6 +151,10 @@ impl GameRenderer {
         // Describe our square
         let vertex_buffer = super::make_vertex_buffer(self.device.clone());
         let index_buffer = super::make_index_buffer(self.device.clone());
+
+        let uniform_buffer = super::make_uniforms_buffer(self.device.clone());
+
+        let rotation_start = Instant::now();
 
         let mut should_recreate_swapchain = false;
 
@@ -202,6 +214,43 @@ impl GameRenderer {
                         should_recreate_swapchain = false;
                     }
 
+                    let uniform_buffer_subbuffer = {
+                        let elapsed = rotation_start.elapsed();
+                        let rotation =
+                            elapsed.as_secs() as f64 + elapsed.subsec_nanos() as f64 / 1_000_000_000.0;
+                        let rotation = Matrix3::from_angle_y(Rad(rotation as f32));
+
+                        let aspect_ratio =
+                            self.swapchain.image_extent()[0] as f32 / self.swapchain.image_extent()[1] as f32;
+                        let proj = cgmath::perspective(
+                            Rad(std::f32::consts::FRAC_PI_2),
+                            aspect_ratio,
+                            0.01,
+                            100.0,
+                        );
+                        let view = Matrix4::look_at_rh(
+                            Point3::new(0.3, 0.3, 1.0),
+                            Point3::new(0.0, 0.0, 0.0),
+                            Vector3::new(0.0, -1.0, 0.0),
+                        );
+                        let scale = Matrix4::from_scale(0.5);
+
+                        let uniform_data = super::shaders::vs::ty::Data {
+                            world: Matrix4::from(rotation).into(),
+                            view: (view * scale).into(),
+                            proj: proj.into(),
+                        };
+
+                        uniform_buffer.from_data(uniform_data).unwrap()
+                    };
+
+                    let pipeline_layout = self.pipeline.layout().set_layouts().get(0).unwrap();
+                    let descriptor_set = PersistentDescriptorSet::new(
+                        pipeline_layout.clone(),
+                        [WriteDescriptorSet::buffer(0, uniform_buffer_subbuffer)],
+                    )
+                    .unwrap();
+
                     // Acquire image from the swapchain for drawing. Wait if no image is yet
                     // available.
                     let (image_num, suboptimal, acquire_future) =
@@ -221,7 +270,7 @@ impl GameRenderer {
                     }
 
                     let command_buffer =
-                        self.build_command_buffer(image_num, vertex_buffer.clone(), index_buffer.clone());
+                        self.build_command_buffer(image_num, descriptor_set.clone(), vertex_buffer.clone(), index_buffer.clone());
 
                     let future = previous_frame_end
                         .take()

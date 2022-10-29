@@ -7,6 +7,8 @@ edition = "2021"
 
 bytemuck = "1.12"
 
+cgmath = "0.18"
+
 vulkano = "0.31"
 vulkano-shaders = "0.31"
 vulkano-win = "0.31"

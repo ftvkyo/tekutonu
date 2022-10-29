@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bytemuck::{Pod, Zeroable};
 use vulkano::{
-    buffer::{BufferUsage, CpuAccessibleBuffer},
+    buffer::{BufferUsage, CpuAccessibleBuffer, CpuBufferPool},
     device::Device,
     impl_vertex,
 };
@@ -22,23 +22,23 @@ mod swapchain;
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Zeroable, Pod)]
 pub struct Vertex {
-    position: [f32; 2],
+    position: [f32; 3],
 }
 impl_vertex!(Vertex, position);
 
 pub fn make_vertex_buffer(device: Arc<Device>) -> Arc<CpuAccessibleBuffer<[Vertex]>> {
     let vertices = [
         Vertex {
-            position: [-0.5, -0.5],
+            position: [-0.5, -0.5, 0.0],
         },
         Vertex {
-            position: [-0.5, 0.5],
+            position: [-0.5, 0.5, 0.0],
         },
         Vertex {
-            position: [0.5, 0.5],
+            position: [0.5, 0.5, 0.0],
         },
         Vertex {
-            position: [0.5, -0.5],
+            position: [0.5, -0.5, 0.0],
         },
     ];
 
@@ -67,4 +67,14 @@ pub fn make_index_buffer(device: Arc<Device>) -> Arc<CpuAccessibleBuffer<[u16]>>
         indices,
     )
     .unwrap()
+}
+
+pub fn make_uniforms_buffer(device: Arc<Device>) -> CpuBufferPool<shaders::vs::ty::Data> {
+    CpuBufferPool::<shaders::vs::ty::Data>::new(
+        device.clone(),
+        BufferUsage {
+            uniform_buffer: true,
+            ..BufferUsage::empty()
+        },
+    )
 }
