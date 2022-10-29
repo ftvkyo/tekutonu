@@ -29,6 +29,7 @@ use vulkano::{
         GraphicsPipeline,
     },
     render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass},
+    shader::ShaderModule,
     swapchain::{
         acquire_next_image,
         AcquireError,
@@ -150,7 +151,10 @@ mod fs {
     }
 }
 
-fn create_swapchain_and_images(device: Arc<Device>, surface: Arc<Surface<Window>>) -> (Arc<Swapchain<Window>>, Vec<Arc<SwapchainImage<Window>>>) {
+fn create_swapchain_and_images(
+    device: Arc<Device>,
+    surface: Arc<Surface<Window>>,
+) -> (Arc<Swapchain<Window>>, Vec<Arc<SwapchainImage<Window>>>) {
     // We will only be allowed to request capabilities that are supported by the
     // surface
     let surface_capabilities = device
@@ -174,8 +178,8 @@ fn create_swapchain_and_images(device: Arc<Device>, surface: Arc<Surface<Window>
     };
 
     Swapchain::new(
-        device.clone(),
-        surface.clone(),
+        device,
+        surface,
         SwapchainCreateInfo {
             image_format,
             image_extent,
@@ -203,28 +207,15 @@ fn create_swapchain_and_images(device: Arc<Device>, surface: Arc<Surface<Window>
     .unwrap()
 }
 
-fn main() {
-    let instance = make_instance();
+// How we are going to give data to the device
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Zeroable, Pod)]
+struct Vertex {
+    position: [f32; 2],
+}
+impl_vertex!(Vertex, position);
 
-    let event_loop = EventLoop::new();
-    let surface = WindowBuilder::new()
-        .build_vk_surface(&event_loop, instance.clone())
-        .unwrap();
-
-    let (device, queue) = choose_device_and_queue(instance.clone(), surface.clone());
-
-    // Allocating color (image) buffers through creating a swapchain.
-    let (mut swapchain, images) = create_swapchain_and_images(device.clone(), surface.clone());
-
-    // How we are going to give data to the device
-    #[repr(C)]
-    #[derive(Clone, Copy, Debug, Default, Zeroable, Pod)]
-    struct Vertex {
-        position: [f32; 2],
-    }
-    impl_vertex!(Vertex, position);
-
-    // Describe our triangle
+fn make_vertex_buffer(device: Arc<Device>) -> Arc<CpuAccessibleBuffer<[Vertex]>> {
     let vertices = [
         Vertex {
             position: [-0.5, -0.25],
@@ -236,8 +227,9 @@ fn main() {
             position: [0.25, -0.1],
         },
     ];
-    let vertex_buffer = CpuAccessibleBuffer::from_iter(
-        device.clone(),
+
+    CpuAccessibleBuffer::from_iter(
+        device,
         BufferUsage {
             vertex_buffer: true,
             ..BufferUsage::empty()
@@ -245,16 +237,12 @@ fn main() {
         false,
         vertices,
     )
-    .unwrap();
+    .unwrap()
+}
 
-    // Creating shaders
-    let vs = vs::load(device.clone()).unwrap();
-    let fs = fs::load(device.clone()).unwrap();
-
-    // Describe where the output of the graphics pipeline will go by creating a
-    // RenderPass.
-    let render_pass = vulkano::single_pass_renderpass!(
-        device.clone(),
+fn make_render_pass(device: Arc<Device>, swapchain: Arc<Swapchain<Window>>) -> Arc<RenderPass> {
+    vulkano::single_pass_renderpass!(
+        device,
         // TODO: read about attachments
         attachments: {
             // Making the only attachment with a custom name `color`
@@ -276,12 +264,18 @@ fn main() {
             depth_stencil: {}
         }
     )
-    .unwrap();
+    .unwrap()
+}
 
-    // Specify what we want the device to do
-    let pipeline = GraphicsPipeline::start()
+fn make_pipeline(
+    device: Arc<Device>,
+    render_pass: Arc<RenderPass>,
+    vs: Arc<ShaderModule>,
+    fs: Arc<ShaderModule>,
+) -> Arc<GraphicsPipeline> {
+    GraphicsPipeline::start()
         // Which subpass of which render pass this pipeline is going to be used in.
-        .render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
+        .render_pass(Subpass::from(render_pass, 0).unwrap())
         // How the vertices are laid out.
         .vertex_input_state(BuffersDefinition::new().vertex::<Vertex>())
         // The content of the vertex buffer describes a list of triangles.
@@ -290,8 +284,62 @@ fn main() {
         // Use a resizable viewport set to draw over the entire window
         .viewport_state(ViewportState::viewport_dynamic_scissor_irrelevant())
         .fragment_shader(fs.entry_point("main").unwrap(), ())
-        .build(device.clone())
+        .build(device)
+        .unwrap()
+}
+
+/// This method is called once during initialization, then again whenever the
+/// window is resized
+fn window_size_dependent_setup(
+    images: &[Arc<SwapchainImage<Window>>],
+    render_pass: Arc<RenderPass>,
+    viewport: &mut Viewport,
+) -> Vec<Arc<Framebuffer>> {
+    let dimensions = images[0].dimensions().width_height();
+    viewport.dimensions = [dimensions[0] as f32, dimensions[1] as f32];
+
+    images
+        .iter()
+        .map(|image| {
+            let view = ImageView::new_default(image.clone()).unwrap();
+            Framebuffer::new(
+                render_pass.clone(),
+                FramebufferCreateInfo {
+                    attachments: vec![view],
+                    ..Default::default()
+                },
+            )
+            .unwrap()
+        })
+        .collect::<Vec<_>>()
+}
+
+fn main() {
+    let instance = make_instance();
+
+    let event_loop = EventLoop::new();
+    let surface = WindowBuilder::new()
+        .build_vk_surface(&event_loop, instance.clone())
         .unwrap();
+
+    let (device, queue) = choose_device_and_queue(instance, surface.clone());
+
+    // Allocating color (image) buffers through creating a swapchain.
+    let (mut swapchain, images) = create_swapchain_and_images(device.clone(), surface.clone());
+
+    // Describe our triangle
+    let vertex_buffer = make_vertex_buffer(device.clone());
+
+    // Creating shaders
+    let vs = vs::load(device.clone()).unwrap();
+    let fs = fs::load(device.clone()).unwrap();
+
+    // Describe where the output of the graphics pipeline will go by creating a
+    // RenderPass.
+    let render_pass = make_render_pass(device.clone(), swapchain.clone());
+
+    // Specify what we want the device to do
+    let pipeline = make_pipeline(device.clone(), render_pass.clone(), vs, fs);
 
     // Dynamic viewports allow us to recreate just the viewport when the window is
     // resized Otherwise we would have to recreate the whole pipeline.
@@ -494,30 +542,4 @@ fn main() {
             _ => (),
         }
     });
-}
-
-/// This method is called once during initialization, then again whenever the
-/// window is resized
-fn window_size_dependent_setup(
-    images: &[Arc<SwapchainImage<Window>>],
-    render_pass: Arc<RenderPass>,
-    viewport: &mut Viewport,
-) -> Vec<Arc<Framebuffer>> {
-    let dimensions = images[0].dimensions().width_height();
-    viewport.dimensions = [dimensions[0] as f32, dimensions[1] as f32];
-
-    images
-        .iter()
-        .map(|image| {
-            let view = ImageView::new_default(image.clone()).unwrap();
-            Framebuffer::new(
-                render_pass.clone(),
-                FramebufferCreateInfo {
-                    attachments: vec![view],
-                    ..Default::default()
-                },
-            )
-            .unwrap()
-        })
-        .collect::<Vec<_>>()
 }
