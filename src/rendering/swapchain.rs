@@ -49,13 +49,14 @@ pub fn make_swapchain_and_images(
                 ..ImageUsage::empty()
             },
 
-            // TODO: read more. maybe this means transparent window and compositing with other
-            // windows?
+            /*
+            // Сompositing with other windows using the alpha channel
             composite_alpha: surface_capabilities
                 .supported_composite_alpha
                 .iter()
                 .next()
                 .unwrap(),
+            */
 
             ..Default::default()
         },
