@@ -57,7 +57,6 @@ pub fn make_swapchain_and_images(
                 .next()
                 .unwrap(),
             */
-
             ..Default::default()
         },
     )

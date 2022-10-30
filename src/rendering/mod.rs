@@ -71,7 +71,7 @@ pub fn make_index_buffer(device: Arc<Device>) -> Arc<CpuAccessibleBuffer<[u16]>>
 
 pub fn make_uniforms_buffer(device: Arc<Device>) -> CpuBufferPool<shaders::vs::ty::Data> {
     CpuBufferPool::<shaders::vs::ty::Data>::new(
-        device.clone(),
+        device,
         BufferUsage {
             uniform_buffer: true,
             ..BufferUsage::empty()

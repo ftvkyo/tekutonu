@@ -1,8 +1,13 @@
-use std::{sync::Arc, time::{Instant, Duration}};
+use std::{sync::Arc, time::Instant};
 
-use cgmath::{Matrix3, Rad, Point3, Vector3, Matrix4};
+use cgmath::{Deg, InnerSpace, Matrix4, One, Point3, Rad, Vector3};
 use vulkano::{
-    buffer::{CpuAccessibleBuffer, TypedBufferAccess, cpu_pool::CpuBufferPoolSubbuffer, CpuBufferPool},
+    buffer::{
+        cpu_pool::CpuBufferPoolSubbuffer,
+        CpuAccessibleBuffer,
+        CpuBufferPool,
+        TypedBufferAccess,
+    },
     command_buffer::{
         AutoCommandBufferBuilder,
         CommandBufferUsage,
@@ -10,8 +15,10 @@ use vulkano::{
         RenderPassBeginInfo,
         SubpassContents,
     },
+    descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
     device::{Device, Queue},
     instance::Instance,
+    memory::pool::StandardMemoryPool,
     pipeline::{graphics::viewport::Viewport, GraphicsPipeline, Pipeline, PipelineBindPoint},
     render_pass::{Framebuffer, RenderPass},
     swapchain::{
@@ -23,12 +30,13 @@ use vulkano::{
         SwapchainCreateInfo,
         SwapchainCreationError,
     },
-    sync::{self, FlushError, GpuFuture}, descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet}, memory::pool::StandardMemoryPool,
+    sync::{self, FlushError, GpuFuture},
 };
 use winit::{
+    dpi::{PhysicalSize, Size},
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    window::Window, dpi::PhysicalSize,
+    window::Window,
 };
 
 use super::Vertex;
@@ -45,16 +53,18 @@ pub struct GameRenderer {
     framebuffers: Vec<Arc<Framebuffer>>,
 }
 
-struct UniformInput {
-    elapsed: Duration,
-}
-
 impl GameRenderer {
     pub fn new(instance: Arc<Instance>, event_loop: &EventLoop<()>) -> Self {
         use vulkano_win::VkSurfaceBuild;
         use winit::window::WindowBuilder;
 
         let surface = WindowBuilder::new()
+            .with_resizable(false)
+            .with_inner_size(Size::Physical(PhysicalSize {
+                width: 800,
+                height: 600,
+            }))
+            .with_title("tekutonu")
             .build_vk_surface(event_loop, instance.clone())
             .unwrap();
 
@@ -78,7 +88,8 @@ impl GameRenderer {
         // Dynamic viewports allow us to recreate just the viewport when the window is
         // resized.
         // Otherwise we would have to recreate the whole pipeline.
-        // However, not using a dynamic viewport could allow the driver to optimize some things at the cost of slower resizes.
+        // However, not using a dynamic viewport could allow the driver to optimize some
+        // things at the cost of slower resizes.
         let mut viewport = Viewport {
             origin: [0.0, 0.0],
             dimensions: [0.0, 0.0],
@@ -138,7 +149,7 @@ impl GameRenderer {
                 0,
                 descriptor_set,
             )
-            .bind_vertex_buffers(0, vertex_buffer.clone())
+            .bind_vertex_buffers(0, vertex_buffer)
             .bind_index_buffer(index_buffer.clone())
             .draw_indexed(index_buffer.len() as u32, 1, 0, 0, 0)
             .unwrap()
@@ -153,8 +164,7 @@ impl GameRenderer {
         &mut self,
         dimensions: PhysicalSize<u32>,
     ) -> Result<(Arc<Swapchain<Window>>, Vec<Arc<Framebuffer>>), ()> {
-        let (new_swapchain, new_images) =
-        match self.swapchain.recreate(SwapchainCreateInfo {
+        let (new_swapchain, new_images) = match self.swapchain.recreate(SwapchainCreateInfo {
             image_extent: dimensions.into(),
             ..self.swapchain.create_info()
         }) {
@@ -179,29 +189,31 @@ impl GameRenderer {
     fn create_uniform_subbuffer(
         &mut self,
         uniform_buffer_pool: CpuBufferPool<super::shaders::vs::ty::Data>,
-        input: UniformInput,
+        camera_position: Point3<f32>,
+        camera_direction: Vector3<f32>,
     ) -> Arc<CpuBufferPoolSubbuffer<super::shaders::vs::ty::Data, Arc<StandardMemoryPool>>> {
-        let rotation =
-            input.elapsed.as_secs() as f64 + input.elapsed.subsec_nanos() as f64 / 1_000_000_000.0;
-        let rotation = Matrix3::from_angle_y(Rad(rotation as f32));
-
         let aspect_ratio =
             self.swapchain.image_extent()[0] as f32 / self.swapchain.image_extent()[1] as f32;
+
+        // Perspective projection matrix
         let proj = cgmath::perspective(
+            // 90 degrees
             Rad(std::f32::consts::FRAC_PI_2),
             aspect_ratio,
             0.01,
             100.0,
         );
+
         let view = Matrix4::look_at_rh(
-            Point3::new(0.3, 0.3, 1.0),
-            Point3::new(0.0, 0.0, 0.0),
+            camera_position,
+            camera_position + camera_direction,
             Vector3::new(0.0, -1.0, 0.0),
         );
+
         let scale = Matrix4::from_scale(0.5);
 
         let uniform_data = super::shaders::vs::ty::Data {
-            world: Matrix4::from(rotation).into(),
+            world: Matrix4::one().into(),
             view: (view * scale).into(),
             proj: proj.into(),
         };
@@ -210,6 +222,9 @@ impl GameRenderer {
     }
 
     pub fn render(mut self, event_loop: EventLoop<()>) {
+        let camera_position = Point3::new(0.5, 0.5, 1.0);
+        let camera_direction = Vector3::new(1.0, 0.0, 1.0).normalize();
+
         // Describe our square
         let vertex_buffer = super::make_vertex_buffer(self.device.clone());
         let index_buffer = super::make_index_buffer(self.device.clone());
@@ -260,15 +275,22 @@ impl GameRenderer {
                             },
                             _ => {
                                 return;
-                            }
+                            },
                         }
                         should_recreate_swapchain = false;
                     }
 
-                    let elapsed = rotation_start.elapsed();
-                    let uniform_buffer_subbuffer = self.create_uniform_subbuffer(uniform_buffer_pool.clone(), UniformInput {
-                        elapsed,
-                    });
+                    let elapsed = rotation_start.elapsed().as_secs_f32();
+                    let rotation_angle = Deg(elapsed * 90.0);
+                    let rotation = Matrix4::from_angle_y(rotation_angle);
+
+                    let camera_direction = (rotation * camera_direction.extend(1.0)).truncate();
+
+                    let uniform_buffer_subbuffer = self.create_uniform_subbuffer(
+                        uniform_buffer_pool.clone(),
+                        camera_position,
+                        camera_direction,
+                    );
 
                     let pipeline_layout = self.pipeline.layout().set_layouts().get(0).unwrap();
                     let descriptor_set = PersistentDescriptorSet::new(
@@ -295,8 +317,12 @@ impl GameRenderer {
                         should_recreate_swapchain = true;
                     }
 
-                    let command_buffer =
-                        self.build_command_buffer(image_num, descriptor_set.clone(), vertex_buffer.clone(), index_buffer.clone());
+                    let command_buffer = self.build_command_buffer(
+                        image_num,
+                        descriptor_set,
+                        vertex_buffer.clone(),
+                        index_buffer.clone(),
+                    );
 
                     let future = previous_frame_end
                         .take()
