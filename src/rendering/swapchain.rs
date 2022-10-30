@@ -19,7 +19,7 @@ pub fn make_swapchain_and_images(
         .unwrap();
 
     // Internal format of the image buffers of the swapchain
-    let image_format = Some(
+    let surface_format = Some(
         device
             .physical_device()
             .surface_formats(&surface, Default::default())
@@ -28,7 +28,7 @@ pub fn make_swapchain_and_images(
     );
 
     // Size of image buffers of the swapchain
-    let image_extent = match surface_capabilities.current_extent {
+    let swap_extent = match surface_capabilities.current_extent {
         Some(extent) => extent,
         None => surface.window().inner_size().into(),
     };
@@ -37,8 +37,8 @@ pub fn make_swapchain_and_images(
         device,
         surface,
         SwapchainCreateInfo {
-            image_format,
-            image_extent,
+            image_format: surface_format,
+            image_extent: swap_extent,
 
             // Can never create less than what surface allows.
             min_image_count: surface_capabilities.min_image_count,
