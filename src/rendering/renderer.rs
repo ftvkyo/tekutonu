@@ -1,8 +1,8 @@
-use std::{sync::Arc, time::Instant};
+use std::{sync::Arc, time::{Instant, Duration}};
 
 use cgmath::{Matrix3, Rad, Point3, Vector3, Matrix4};
 use vulkano::{
-    buffer::{CpuAccessibleBuffer, TypedBufferAccess},
+    buffer::{CpuAccessibleBuffer, TypedBufferAccess, cpu_pool::CpuBufferPoolSubbuffer, CpuBufferPool},
     command_buffer::{
         AutoCommandBufferBuilder,
         CommandBufferUsage,
@@ -23,7 +23,7 @@ use vulkano::{
         SwapchainCreateInfo,
         SwapchainCreationError,
     },
-    sync::{self, FlushError, GpuFuture}, descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
+    sync::{self, FlushError, GpuFuture}, descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet}, memory::pool::StandardMemoryPool,
 };
 use winit::{
     event::{Event, WindowEvent},
@@ -43,6 +43,10 @@ pub struct GameRenderer {
     pipeline: Arc<GraphicsPipeline>,
     viewport: Viewport,
     framebuffers: Vec<Arc<Framebuffer>>,
+}
+
+struct UniformInput {
+    elapsed: Duration,
 }
 
 impl GameRenderer {
@@ -172,13 +176,46 @@ impl GameRenderer {
         Ok((new_swapchain, new_framebuffers))
     }
 
+    fn create_uniform_subbuffer(
+        &mut self,
+        uniform_buffer_pool: CpuBufferPool<super::shaders::vs::ty::Data>,
+        input: UniformInput,
+    ) -> Arc<CpuBufferPoolSubbuffer<super::shaders::vs::ty::Data, Arc<StandardMemoryPool>>> {
+        let rotation =
+            input.elapsed.as_secs() as f64 + input.elapsed.subsec_nanos() as f64 / 1_000_000_000.0;
+        let rotation = Matrix3::from_angle_y(Rad(rotation as f32));
+
+        let aspect_ratio =
+            self.swapchain.image_extent()[0] as f32 / self.swapchain.image_extent()[1] as f32;
+        let proj = cgmath::perspective(
+            Rad(std::f32::consts::FRAC_PI_2),
+            aspect_ratio,
+            0.01,
+            100.0,
+        );
+        let view = Matrix4::look_at_rh(
+            Point3::new(0.3, 0.3, 1.0),
+            Point3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, -1.0, 0.0),
+        );
+        let scale = Matrix4::from_scale(0.5);
+
+        let uniform_data = super::shaders::vs::ty::Data {
+            world: Matrix4::from(rotation).into(),
+            view: (view * scale).into(),
+            proj: proj.into(),
+        };
+
+        uniform_buffer_pool.from_data(uniform_data).unwrap()
+    }
+
     pub fn render(mut self, event_loop: EventLoop<()>) {
         // Describe our square
         let vertex_buffer = super::make_vertex_buffer(self.device.clone());
         let index_buffer = super::make_index_buffer(self.device.clone());
 
         // Describe world rotation and camera position
-        let uniform_buffer = super::make_uniforms_buffer(self.device.clone());
+        let uniform_buffer_pool = super::make_uniforms_buffer(self.device.clone());
 
         let rotation_start = Instant::now();
 
@@ -228,35 +265,10 @@ impl GameRenderer {
                         should_recreate_swapchain = false;
                     }
 
-                    let uniform_buffer_subbuffer = {
-                        let elapsed = rotation_start.elapsed();
-                        let rotation =
-                            elapsed.as_secs() as f64 + elapsed.subsec_nanos() as f64 / 1_000_000_000.0;
-                        let rotation = Matrix3::from_angle_y(Rad(rotation as f32));
-
-                        let aspect_ratio =
-                            self.swapchain.image_extent()[0] as f32 / self.swapchain.image_extent()[1] as f32;
-                        let proj = cgmath::perspective(
-                            Rad(std::f32::consts::FRAC_PI_2),
-                            aspect_ratio,
-                            0.01,
-                            100.0,
-                        );
-                        let view = Matrix4::look_at_rh(
-                            Point3::new(0.3, 0.3, 1.0),
-                            Point3::new(0.0, 0.0, 0.0),
-                            Vector3::new(0.0, -1.0, 0.0),
-                        );
-                        let scale = Matrix4::from_scale(0.5);
-
-                        let uniform_data = super::shaders::vs::ty::Data {
-                            world: Matrix4::from(rotation).into(),
-                            view: (view * scale).into(),
-                            proj: proj.into(),
-                        };
-
-                        uniform_buffer.from_data(uniform_data).unwrap()
-                    };
+                    let elapsed = rotation_start.elapsed();
+                    let uniform_buffer_subbuffer = self.create_uniform_subbuffer(uniform_buffer_pool.clone(), UniformInput {
+                        elapsed,
+                    });
 
                     let pipeline_layout = self.pipeline.layout().set_layouts().get(0).unwrap();
                     let descriptor_set = PersistentDescriptorSet::new(
