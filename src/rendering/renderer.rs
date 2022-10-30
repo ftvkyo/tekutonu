@@ -28,7 +28,7 @@ use vulkano::{
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    window::Window,
+    window::Window, dpi::PhysicalSize,
 };
 
 use super::Vertex;
@@ -142,9 +142,34 @@ impl GameRenderer {
             .unwrap();
 
         // Finish building the command buffer by calling `build`.
-
-
         builder.build().unwrap()
+    }
+
+    fn recreate_swapchain(
+        &mut self,
+        dimensions: PhysicalSize<u32>,
+    ) -> Result<(Arc<Swapchain<Window>>, Vec<Arc<Framebuffer>>), ()> {
+        let (new_swapchain, new_images) =
+        match self.swapchain.recreate(SwapchainCreateInfo {
+            image_extent: dimensions.into(),
+            ..self.swapchain.create_info()
+        }) {
+            Ok(r) => r,
+            // Likely user resizing the window, just retry.
+            Err(SwapchainCreationError::ImageExtentNotSupported { .. }) => {
+                return Err(());
+            },
+            Err(e) => panic!("Failed to recreate swapchain: {:?}", e),
+        };
+
+        // Framebuffers depend on the images
+        let new_framebuffers = super::framebuffer::make_framebuffers(
+            &new_images,
+            self.render_pass.clone(),
+            &mut self.viewport,
+        );
+
+        Ok((new_swapchain, new_framebuffers))
     }
 
     pub fn render(mut self, event_loop: EventLoop<()>) {
@@ -152,6 +177,7 @@ impl GameRenderer {
         let vertex_buffer = super::make_vertex_buffer(self.device.clone());
         let index_buffer = super::make_index_buffer(self.device.clone());
 
+        // Describe world rotation and camera position
         let uniform_buffer = super::make_uniforms_buffer(self.device.clone());
 
         let rotation_start = Instant::now();
@@ -190,27 +216,15 @@ impl GameRenderer {
                     // Whenever the window resizes we need to recreate everything dependent on the
                     // window size.
                     if should_recreate_swapchain {
-                        let (new_swapchain, new_images) =
-                            match self.swapchain.recreate(SwapchainCreateInfo {
-                                image_extent: dimensions.into(),
-                                ..self.swapchain.create_info()
-                            }) {
-                                Ok(r) => r,
-                                // Likely user resizing the window, just retry.
-                                Err(SwapchainCreationError::ImageExtentNotSupported { .. }) => {
-                                    return
-                                },
-                                Err(e) => panic!("Failed to recreate swapchain: {:?}", e),
-                            };
-
-                        self.swapchain = new_swapchain;
-
-                        // Framebuffers depend on the images
-                        self.framebuffers = super::framebuffer::make_framebuffers(
-                            &new_images,
-                            self.render_pass.clone(),
-                            &mut self.viewport,
-                        );
+                        match self.recreate_swapchain(dimensions) {
+                            Ok((swapchain, framebuffers)) => {
+                                self.swapchain = swapchain;
+                                self.framebuffers = framebuffers;
+                            },
+                            _ => {
+                                return;
+                            }
+                        }
                         should_recreate_swapchain = false;
                     }
 
