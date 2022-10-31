@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Instant};
+use std::sync::Arc;
 
 use cgmath::{Deg, InnerSpace, Matrix4, One, Point3, Rad, Vector3};
 use vulkano::{
@@ -34,9 +34,9 @@ use vulkano::{
 };
 use winit::{
     dpi::{PhysicalSize, Size},
-    event::{Event, WindowEvent},
+    event::{DeviceEvent, ElementState, Event, KeyboardInput, ModifiersState, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    window::Window,
+    window::{CursorGrabMode, Window},
 };
 
 use super::Vertex;
@@ -222,8 +222,10 @@ impl GameRenderer {
     }
 
     pub fn render(mut self, event_loop: EventLoop<()>) {
-        let camera_position = Point3::new(0.5, 0.5, 1.0);
-        let camera_direction = Vector3::new(1.0, 0.0, 1.0).normalize();
+        let camera_position: Point3<f32> = Point3::new(0.5, 0.5, 1.0);
+        let mut camera_direction: Vector3<f32> = Vector3::new(1.0, 0.0, 1.0).normalize();
+
+        let mut modifiers = ModifiersState::default();
 
         // Describe our square
         let vertex_buffer = super::make_vertex_buffer(self.device.clone());
@@ -231,8 +233,6 @@ impl GameRenderer {
 
         // Describe world rotation and camera position
         let uniform_buffer_pool = super::make_uniforms_buffer(self.device.clone());
-
-        let rotation_start = Instant::now();
 
         let mut should_recreate_swapchain = false;
 
@@ -242,17 +242,62 @@ impl GameRenderer {
 
         event_loop.run(move |event, _, control_flow| {
             match event {
-                Event::WindowEvent {
-                    event: WindowEvent::CloseRequested,
-                    ..
-                } => {
-                    *control_flow = ControlFlow::Exit;
+                Event::WindowEvent { event, .. } => match event {
+                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                    WindowEvent::Resized(_) => should_recreate_swapchain = true,
+                    WindowEvent::KeyboardInput {
+                        input:
+                            KeyboardInput {
+                                state: ElementState::Released,
+                                virtual_keycode: Some(key),
+                                ..
+                            },
+                        ..
+                    } => {
+                        use winit::event::VirtualKeyCode::*;
+                        let result = match key {
+                            Escape => {
+                                control_flow.set_exit();
+                                Ok(())
+                            },
+                            G => self
+                                .surface
+                                .window()
+                                .set_cursor_grab(CursorGrabMode::Confined),
+                            L => self
+                                .surface
+                                .window()
+                                .set_cursor_grab(CursorGrabMode::Locked),
+                            A => self.surface.window().set_cursor_grab(CursorGrabMode::None),
+                            H => {
+                                self.surface.window().set_cursor_visible(modifiers.shift());
+                                Ok(())
+                            },
+                            _ => Ok(()),
+                        };
+
+                        if let Err(err) = result {
+                            println!("error: {}", err);
+                        }
+                    },
+                    WindowEvent::ModifiersChanged(m) => modifiers = m,
+                    _ => (),
                 },
-                Event::WindowEvent {
-                    event: WindowEvent::Resized(_),
+                Event::DeviceEvent {
+                    event: DeviceEvent::MouseMotion { delta, .. },
                     ..
                 } => {
-                    should_recreate_swapchain = true;
+                    // Project the camera direction on horizontal plane and rotate it 90 degrees
+                    let camera_axis_for_pitch =
+                        Vector3::new(-camera_direction.z, 0.0, camera_direction.y).normalize();
+
+                    let rotation_yaw = Matrix4::from_angle_y(Deg(delta.0 as f32));
+                    let rotation_vertical =
+                        Matrix4::from_axis_angle(camera_axis_for_pitch, Deg(-delta.1 as f32));
+
+                    camera_direction =
+                        (rotation_yaw * rotation_vertical * camera_direction.extend(1.0))
+                            .truncate();
                 },
                 Event::RedrawEventsCleared => {
                     // Do not draw frame when screen dimensions are zero.
@@ -279,12 +324,6 @@ impl GameRenderer {
                         }
                         should_recreate_swapchain = false;
                     }
-
-                    let elapsed = rotation_start.elapsed().as_secs_f32();
-                    let rotation_angle = Deg(elapsed * 90.0);
-                    let rotation = Matrix4::from_angle_y(rotation_angle);
-
-                    let camera_direction = (rotation * camera_direction.extend(1.0)).truncate();
 
                     let uniform_buffer_subbuffer = self.create_uniform_subbuffer(
                         uniform_buffer_pool.clone(),
