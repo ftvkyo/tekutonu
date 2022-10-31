@@ -1,6 +1,9 @@
 pub mod blocks;
 pub mod consts;
+mod model;
 pub mod types;
+pub use model::*;
+
 
 #[cfg(test)]
 mod tests {

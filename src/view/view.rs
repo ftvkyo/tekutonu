@@ -1,6 +1,9 @@
-use std::sync::Arc;
+use std::{
+    f32::consts::{FRAC_PI_2, PI},
+    sync::Arc,
+};
 
-use cgmath::{Deg, InnerSpace, Matrix4, One, Point3, Rad, Vector3};
+use cgmath::{InnerSpace, Matrix4, One, Rad, Vector3};
 use vulkano::{
     buffer::{
         cpu_pool::CpuBufferPoolSubbuffer,
@@ -33,16 +36,17 @@ use vulkano::{
     sync::{self, FlushError, GpuFuture},
 };
 use winit::{
-    dpi::{PhysicalSize, Size},
+    dpi::PhysicalSize,
     event::{DeviceEvent, ElementState, Event, KeyboardInput, ModifiersState, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::{CursorGrabMode, Window},
 };
 
 use super::Vertex;
+use crate::model::{Camera, Game};
 
 
-pub struct GameRenderer {
+pub struct GameView {
     device: Arc<Device>,
     queues: Vec<Arc<Queue>>,
     surface: Arc<Surface<Window>>,
@@ -51,24 +55,27 @@ pub struct GameRenderer {
     pipeline: Arc<GraphicsPipeline>,
     viewport: Viewport,
     framebuffers: Vec<Arc<Framebuffer>>,
+
+    event_loop: Option<EventLoop<()>>,
 }
 
-impl GameRenderer {
-    pub fn new(instance: Arc<Instance>, event_loop: &EventLoop<()>) -> Self {
+impl GameView {
+    pub fn new(vk: Arc<Instance>, event_loop: EventLoop<()>) -> Self {
         use vulkano_win::VkSurfaceBuild;
         use winit::window::WindowBuilder;
 
         let surface = WindowBuilder::new()
             .with_resizable(false)
-            .with_inner_size(Size::Physical(PhysicalSize {
-                width: 800,
-                height: 600,
-            }))
+            // .with_inner_size(Size::Physical(PhysicalSize {
+            //     width: 1920,
+            //     height: 1080,
+            // }))
+            .with_fullscreen(Some(winit::window::Fullscreen::Borderless(None)))
             .with_title("tekutonu")
-            .build_vk_surface(event_loop, instance.clone())
+            .build_vk_surface(&event_loop, vk.clone())
             .unwrap();
 
-        let (device, queues) = super::device::choose_device_and_queue(instance, surface.clone());
+        let (device, queues) = super::device::choose_device_and_queue(vk, surface.clone());
 
         // Allocating color (image) buffers through creating a swapchain.
         let (swapchain, images) =
@@ -112,6 +119,7 @@ impl GameRenderer {
             pipeline,
             viewport,
             framebuffers,
+            event_loop: Some(event_loop),
         }
     }
 
@@ -189,26 +197,30 @@ impl GameRenderer {
     fn create_uniform_subbuffer(
         &mut self,
         uniform_buffer_pool: CpuBufferPool<super::shaders::vs::ty::Data>,
-        camera_position: Point3<f32>,
-        camera_direction: Vector3<f32>,
+        camera: &Camera,
     ) -> Arc<CpuBufferPoolSubbuffer<super::shaders::vs::ty::Data, Arc<StandardMemoryPool>>> {
+        let position = camera.position.map(|v| v as f32);
+
+        let direction_y = f32::sin(camera.pitch.0);
+        // Scale horizontal coordinates down to how much they matter based on the pitch
+        let direction_x = f32::cos(camera.yaw.0) * f32::cos(camera.pitch.0);
+        let direction_z = f32::sin(camera.yaw.0) * f32::cos(camera.pitch.0);
+        let direction = Vector3::new(-direction_x, -direction_y, -direction_z).normalize();
+
         let aspect_ratio =
             self.swapchain.image_extent()[0] as f32 / self.swapchain.image_extent()[1] as f32;
 
         // Perspective projection matrix
         let proj = cgmath::perspective(
             // 90 degrees
-            Rad(std::f32::consts::FRAC_PI_2),
+            Rad(FRAC_PI_2),
             aspect_ratio,
             0.01,
             100.0,
         );
 
-        let view = Matrix4::look_at_rh(
-            camera_position,
-            camera_position + camera_direction,
-            Vector3::new(0.0, -1.0, 0.0),
-        );
+        let view =
+            Matrix4::look_at_rh(position, position + direction, Vector3::new(0.0, -1.0, 0.0));
 
         let scale = Matrix4::from_scale(0.5);
 
@@ -221,9 +233,8 @@ impl GameRenderer {
         uniform_buffer_pool.from_data(uniform_data).unwrap()
     }
 
-    pub fn render(mut self, event_loop: EventLoop<()>) {
-        let camera_position: Point3<f32> = Point3::new(0.5, 0.5, 1.0);
-        let mut camera_direction: Vector3<f32> = Vector3::new(1.0, 0.0, 1.0).normalize();
+    pub fn run(mut self, mut game: Game) {
+        let event_loop = self.event_loop.take().unwrap();
 
         let mut modifiers = ModifiersState::default();
 
@@ -287,17 +298,23 @@ impl GameRenderer {
                     event: DeviceEvent::MouseMotion { delta, .. },
                     ..
                 } => {
-                    // Project the camera direction on horizontal plane and rotate it 90 degrees
-                    let camera_axis_for_pitch =
-                        Vector3::new(-camera_direction.z, 0.0, camera_direction.y).normalize();
+                    const RAD_PER_PX: f32 = FRAC_PI_2 / 90.0;
 
-                    let rotation_yaw = Matrix4::from_angle_y(Deg(delta.0 as f32));
-                    let rotation_vertical =
-                        Matrix4::from_axis_angle(camera_axis_for_pitch, Deg(-delta.1 as f32));
+                    // X is pointing right?
+                    game.camera.yaw.0 -= (delta.0 as f32) * RAD_PER_PX;
+                    // Y is pointing down
+                    game.camera.pitch.0 += (delta.1 as f32) * RAD_PER_PX;
 
-                    camera_direction =
-                        (rotation_yaw * rotation_vertical * camera_direction.extend(1.0))
-                            .truncate();
+                    // Bring yaw to the [-PI, PI] range
+                    while game.camera.yaw.0 > PI {
+                        game.camera.yaw.0 -= PI * 2.0;
+                    }
+                    while game.camera.yaw.0 < -PI {
+                        game.camera.yaw.0 += PI * 2.0;
+                    }
+
+                    // Stop pitching when it's vertical
+                    game.camera.pitch.0 = game.camera.pitch.0.min(FRAC_PI_2).max(-FRAC_PI_2);
                 },
                 Event::RedrawEventsCleared => {
                     // Do not draw frame when screen dimensions are zero.
@@ -325,11 +342,8 @@ impl GameRenderer {
                         should_recreate_swapchain = false;
                     }
 
-                    let uniform_buffer_subbuffer = self.create_uniform_subbuffer(
-                        uniform_buffer_pool.clone(),
-                        camera_position,
-                        camera_direction,
-                    );
+                    let uniform_buffer_subbuffer =
+                        self.create_uniform_subbuffer(uniform_buffer_pool.clone(), &game.camera);
 
                     let pipeline_layout = self.pipeline.layout().set_layouts().get(0).unwrap();
                     let descriptor_set = PersistentDescriptorSet::new(

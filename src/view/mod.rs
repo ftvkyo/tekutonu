@@ -8,7 +8,7 @@ use vulkano::{
 };
 
 pub mod instance;
-pub mod renderer;
+pub use view::*;
 
 mod device;
 mod framebuffer;
@@ -16,6 +16,7 @@ mod pipeline;
 mod render_pass;
 mod shaders;
 mod swapchain;
+mod view;
 
 
 // How we are going to give data to the device
