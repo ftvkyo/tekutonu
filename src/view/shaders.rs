@@ -32,7 +32,8 @@ pub mod fs {
             layout(location = 0) out vec4 f_color;
 
             void main() {
-                f_color = vec4(1.0, 0.0, 0.0, 1.0);
+                float intensity = length(gl_PointCoord);
+                f_color = vec4(intensity, intensity, intensity, 1.0);
             }
         "
     }

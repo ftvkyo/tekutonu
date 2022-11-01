@@ -143,7 +143,7 @@ impl GameView {
                 RenderPassBeginInfo {
                     // One item for each attachment in the render pass that have `LoadOp::Clear`
                     // (otherwise None)
-                    clear_values: vec![Some([0.0, 0.0, 1.0, 1.0].into())],
+                    clear_values: vec![Some([0.0, 0.0, 0.0, 1.0].into())],
                     ..RenderPassBeginInfo::framebuffer(self.framebuffers[image_num].clone())
                 },
                 SubpassContents::Inline,
