@@ -1,4 +1,5 @@
 use tekutonu::{
+    controller::InputProcessor,
     model::Game,
     view::{instance::make_instance, GameView},
 };
@@ -12,5 +13,7 @@ fn main() {
     let view = GameView::new(vk, event_loop);
 
     let game = Game::default();
-    view.run(game);
+    let input = InputProcessor::new();
+
+    view.run(game, input);
 }

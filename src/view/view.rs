@@ -1,7 +1,4 @@
-use std::{
-    f32::consts::{FRAC_PI_2, PI},
-    sync::Arc,
-};
+use std::{f32::consts::FRAC_PI_2, sync::Arc};
 
 use cgmath::{InnerSpace, Matrix4, One, Rad, Vector3};
 use vulkano::{
@@ -43,7 +40,10 @@ use winit::{
 };
 
 use super::Vertex;
-use crate::model::{Camera, Game};
+use crate::{
+    controller::InputProcessor,
+    model::{Camera, Game},
+};
 
 
 pub struct GameView {
@@ -233,7 +233,7 @@ impl GameView {
         uniform_buffer_pool.from_data(uniform_data).unwrap()
     }
 
-    pub fn run(mut self, mut game: Game) {
+    pub fn run(mut self, mut game: Game, input: InputProcessor) {
         let event_loop = self.event_loop.take().unwrap();
 
         let mut modifiers = ModifiersState::default();
@@ -298,23 +298,7 @@ impl GameView {
                     event: DeviceEvent::MouseMotion { delta, .. },
                     ..
                 } => {
-                    const RAD_PER_PX: f32 = FRAC_PI_2 / 90.0;
-
-                    // X is pointing right?
-                    game.camera.yaw.0 -= (delta.0 as f32) * RAD_PER_PX;
-                    // Y is pointing down
-                    game.camera.pitch.0 += (delta.1 as f32) * RAD_PER_PX;
-
-                    // Bring yaw to the [-PI, PI] range
-                    while game.camera.yaw.0 > PI {
-                        game.camera.yaw.0 -= PI * 2.0;
-                    }
-                    while game.camera.yaw.0 < -PI {
-                        game.camera.yaw.0 += PI * 2.0;
-                    }
-
-                    // Stop pitching when it's vertical
-                    game.camera.pitch.0 = game.camera.pitch.0.min(FRAC_PI_2).max(-FRAC_PI_2);
+                    input.process_mouse_movement(&mut game, delta);
                 },
                 Event::RedrawEventsCleared => {
                     // Do not draw frame when screen dimensions are zero.
