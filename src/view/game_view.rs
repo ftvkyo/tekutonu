@@ -34,15 +34,16 @@ use vulkano::{
 };
 use winit::{
     dpi::PhysicalSize,
+    error::ExternalError,
     event::{DeviceEvent, ElementState, Event, KeyboardInput, ModifiersState, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    window::{CursorGrabMode, Window}, error::ExternalError,
+    window::{CursorGrabMode, Window},
 };
 
 use super::Vertex;
 use crate::{
     controller::GameInput,
-    model::{Camera, Game},
+    model::{Camera, GameModel},
 };
 
 
@@ -234,7 +235,11 @@ impl GameView {
     }
 
     pub fn set_cursor_locked(&self, locked: bool) -> Result<(), ExternalError> {
-        let grab = if locked { CursorGrabMode::Locked } else { CursorGrabMode::None };
+        let grab = if locked {
+            CursorGrabMode::Locked
+        } else {
+            CursorGrabMode::None
+        };
         self.surface.window().set_cursor_grab(grab)
     }
 
@@ -242,7 +247,7 @@ impl GameView {
         self.surface.window().set_cursor_visible(!hidden)
     }
 
-    pub fn run(mut self, mut game: Game, input: GameInput) {
+    pub fn run(mut self, mut game: GameModel, input: GameInput) {
         let event_loop = self.event_loop.take().unwrap();
 
         let mut modifiers = ModifiersState::default();
@@ -273,14 +278,17 @@ impl GameView {
                                 ..
                             },
                         ..
-                    } => input.process_keyboard_input(&mut game, &self, key, control_flow),
+                    } => input.process_keyboard_input(&self, key, control_flow),
                     WindowEvent::ModifiersChanged(m) => modifiers = m,
                     _ => (),
                 },
                 Event::DeviceEvent {
                     event: DeviceEvent::MouseMotion { delta, .. },
                     ..
-                } => input.process_mouse_movement(&mut game, delta),
+                } => {
+                    let effect = input.mouse_movement(delta);
+                    game.apply_effect(effect);
+                },
                 Event::RedrawEventsCleared => {
                     // Do not draw frame when screen dimensions are zero.
                     // On Windows, this can occur from minimizing the application.

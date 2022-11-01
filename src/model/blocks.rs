@@ -40,6 +40,10 @@ impl Chunk {
         &self.blocks[Self::generate_index(location)]
     }
 
+    pub fn get_block_mut(&mut self, location: t::PointInt) -> &mut Block {
+        &mut self.blocks[Self::generate_index(location)]
+    }
+
     pub fn set_block(&mut self, location: t::PointInt, block: Block) {
         self.blocks[Self::generate_index(location)] = block;
     }
@@ -63,6 +67,10 @@ impl Region {
 
     pub fn get_chunk<'s>(&'s self, location: t::PointInt) -> &'s Chunk {
         &self.chunks[Self::generate_index(location)]
+    }
+
+    pub fn get_chunk_mut(&mut self, location: t::PointInt) -> &mut Chunk {
+        &mut self.chunks[Self::generate_index(location)]
     }
 
     pub fn set_chunk(&mut self, location: t::PointInt, chunk: Chunk) {

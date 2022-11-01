@@ -1,8 +1,9 @@
 pub mod blocks;
 pub mod consts;
-mod model;
+pub mod effect;
+mod game_model;
 pub mod types;
-pub use model::*;
+pub use game_model::*;
 
 
 #[cfg(test)]
