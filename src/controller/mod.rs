@@ -1,11 +1,13 @@
 use std::f32::consts::{FRAC_PI_2, PI};
 
-use crate::model::Game;
+use winit::{event::VirtualKeyCode, event_loop::ControlFlow};
+
+use crate::{model::Game, view::GameView};
 
 
-pub struct InputProcessor {}
+pub struct GameInput {}
 
-impl InputProcessor {
+impl GameInput {
     pub fn new() -> Self {
         Self {}
     }
@@ -28,5 +30,28 @@ impl InputProcessor {
 
         // Stop pitching when it's vertical
         game.camera.pitch.0 = game.camera.pitch.0.min(FRAC_PI_2).max(-FRAC_PI_2);
+    }
+
+    pub fn process_keyboard_input(&self, game: &mut Game, view: &GameView, key: VirtualKeyCode, control_flow: &mut ControlFlow) {
+        use winit::event::VirtualKeyCode as kc;
+        let result = match key {
+            kc::Escape => {
+                control_flow.set_exit();
+                Ok(())
+            },
+            kc::L => {
+                view.set_cursor_hidden(true);
+                view.set_cursor_locked(true)
+            },
+            kc::U => {
+                view.set_cursor_hidden(false);
+                view.set_cursor_locked(false)
+            },
+            _ => Ok(()),
+        };
+
+        if let Err(err) = result {
+            println!("error: {}", err);
+        }
     }
 }

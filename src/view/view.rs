@@ -36,12 +36,12 @@ use winit::{
     dpi::PhysicalSize,
     event::{DeviceEvent, ElementState, Event, KeyboardInput, ModifiersState, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    window::{CursorGrabMode, Window},
+    window::{CursorGrabMode, Window}, error::ExternalError,
 };
 
 use super::Vertex;
 use crate::{
-    controller::InputProcessor,
+    controller::GameInput,
     model::{Camera, Game},
 };
 
@@ -233,7 +233,16 @@ impl GameView {
         uniform_buffer_pool.from_data(uniform_data).unwrap()
     }
 
-    pub fn run(mut self, mut game: Game, input: InputProcessor) {
+    pub fn set_cursor_locked(&self, locked: bool) -> Result<(), ExternalError> {
+        let grab = if locked { CursorGrabMode::Locked } else { CursorGrabMode::None };
+        self.surface.window().set_cursor_grab(grab)
+    }
+
+    pub fn set_cursor_hidden(&self, hidden: bool) {
+        self.surface.window().set_cursor_visible(!hidden)
+    }
+
+    pub fn run(mut self, mut game: Game, input: GameInput) {
         let event_loop = self.event_loop.take().unwrap();
 
         let mut modifiers = ModifiersState::default();
@@ -264,42 +273,14 @@ impl GameView {
                                 ..
                             },
                         ..
-                    } => {
-                        use winit::event::VirtualKeyCode::*;
-                        let result = match key {
-                            Escape => {
-                                control_flow.set_exit();
-                                Ok(())
-                            },
-                            G => self
-                                .surface
-                                .window()
-                                .set_cursor_grab(CursorGrabMode::Confined),
-                            L => self
-                                .surface
-                                .window()
-                                .set_cursor_grab(CursorGrabMode::Locked),
-                            A => self.surface.window().set_cursor_grab(CursorGrabMode::None),
-                            H => {
-                                self.surface.window().set_cursor_visible(modifiers.shift());
-                                Ok(())
-                            },
-                            _ => Ok(()),
-                        };
-
-                        if let Err(err) = result {
-                            println!("error: {}", err);
-                        }
-                    },
+                    } => input.process_keyboard_input(&mut game, &self, key, control_flow),
                     WindowEvent::ModifiersChanged(m) => modifiers = m,
                     _ => (),
                 },
                 Event::DeviceEvent {
                     event: DeviceEvent::MouseMotion { delta, .. },
                     ..
-                } => {
-                    input.process_mouse_movement(&mut game, delta);
-                },
+                } => input.process_mouse_movement(&mut game, delta),
                 Event::RedrawEventsCleared => {
                     // Do not draw frame when screen dimensions are zero.
                     // On Windows, this can occur from minimizing the application.
