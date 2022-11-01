@@ -1,6 +1,6 @@
-use crate::{consts as c, types as t};
+use super::{consts as c, types as t};
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum BlockKind {
     Air,
     Stone,
