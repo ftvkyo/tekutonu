@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
+use tracing::instrument;
 use vulkano::instance::Instance;
 
+#[instrument]
 pub fn make_instance() -> Arc<Instance> {
     use vulkano::{instance::InstanceCreateInfo, VulkanLibrary};
 

@@ -3,10 +3,15 @@ use tekutonu::{
     model::GameModel,
     view::{instance::make_instance, GameView},
 };
+use tracing_subscriber::fmt::format::FmtSpan;
 use winit::event_loop::EventLoop;
 
 
 fn main() {
+    tracing_subscriber::fmt()
+        .with_span_events(FmtSpan::ACTIVE)
+        .init();
+
     let vk = make_instance();
 
     let event_loop = EventLoop::new();

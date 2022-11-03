@@ -1,6 +1,7 @@
 use std::{f32::consts::FRAC_PI_2, sync::Arc};
 
 use cgmath::{InnerSpace, Matrix4, One, Rad, Vector3};
+use tracing::instrument;
 use vulkano::{
     buffer::{
         cpu_pool::CpuBufferPoolSubbuffer,
@@ -61,6 +62,7 @@ pub struct GameView {
 }
 
 impl GameView {
+    #[instrument(skip_all)]
     pub fn new(vk: Arc<Instance>, event_loop: EventLoop<()>) -> Self {
         use vulkano_win::VkSurfaceBuild;
         use winit::window::WindowBuilder;
@@ -169,6 +171,7 @@ impl GameView {
         builder.build().unwrap()
     }
 
+    #[instrument(skip_all)]
     fn recreate_swapchain(
         &mut self,
         dimensions: PhysicalSize<u32>,
@@ -234,6 +237,7 @@ impl GameView {
         uniform_buffer_pool.from_data(uniform_data).unwrap()
     }
 
+    #[instrument(skip_all)]
     pub fn set_cursor_locked(&self, locked: bool) -> Result<(), ExternalError> {
         let grab = if locked {
             CursorGrabMode::Locked
@@ -249,10 +253,12 @@ impl GameView {
         }
     }
 
+    #[instrument(skip_all)]
     pub fn set_cursor_hidden(&self, hidden: bool) {
         self.surface.window().set_cursor_visible(!hidden)
     }
 
+    #[instrument(skip_all)]
     pub fn run(mut self, mut game: GameModel, input: GameInput) {
         let event_loop = self.event_loop.take().unwrap();
 

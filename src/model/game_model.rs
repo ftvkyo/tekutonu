@@ -1,6 +1,7 @@
 use std::f32::consts::FRAC_PI_2;
 
 use cgmath::{Point3, Rad};
+use tracing::instrument;
 
 use super::{
     blocks::{Block, BlockKind, Region},
@@ -31,6 +32,7 @@ pub struct GameModel {
 }
 
 impl Default for GameModel {
+    #[instrument]
     fn default() -> Self {
         let mut world = Region::new();
 
