@@ -1,7 +1,10 @@
-use std::f32::consts::FRAC_PI_2;
+use std::f64::consts::FRAC_PI_2;
 
-use cgmath::Rad;
-use winit::{event::VirtualKeyCode, event_loop::ControlFlow};
+use cgmath::{Rad, Vector3};
+use winit::{
+    event::{ElementState, VirtualKeyCode},
+    event_loop::ControlFlow,
+};
 
 use crate::{model::effect::GameModelEffect, view::GameView};
 
@@ -14,39 +17,49 @@ impl GameInput {
     }
 
     pub fn mouse_movement(&self, delta: (f64, f64)) -> GameModelEffect {
-        const RAD_PER_PX: f32 = FRAC_PI_2 / 90.0;
+        const RAD_PER_PX: f64 = FRAC_PI_2 / 90.0;
 
-        GameModelEffect::UpdateCameraLook {
-            delta_pitch: Rad((delta.1 as f32) * RAD_PER_PX),
-            delta_yaw: Rad(-(delta.0 as f32) * RAD_PER_PX),
+        GameModelEffect::AdjustCameraAngles {
+            delta_pitch: Rad(delta.1 * RAD_PER_PX),
+            delta_yaw: Rad(delta.0 * RAD_PER_PX),
         }
     }
 
-    pub fn process_keyboard_input(
+    pub fn keyboard(
         &self,
-        view: &GameView,
+        _view: &GameView,
         key: VirtualKeyCode,
+        state: ElementState,
         control_flow: &mut ControlFlow,
-    ) {
-        use winit::event::VirtualKeyCode as kc;
-        let result = match key {
-            kc::Escape => {
-                control_flow.set_exit();
-                Ok(())
-            },
-            kc::L => {
-                view.set_cursor_hidden(true);
-                view.set_cursor_locked(true)
-            },
-            kc::U => {
-                view.set_cursor_hidden(false);
-                view.set_cursor_locked(false)
-            },
-            _ => Ok(()),
-        };
+    ) -> Option<GameModelEffect> {
+        use winit::event::{ElementState::*, VirtualKeyCode::*};
 
-        if let Err(err) = result {
-            println!("error: {}", err);
+
+        match (key, state) {
+            (Escape, Released) => {
+                control_flow.set_exit();
+                None
+            },
+            (W, Released) => Some(GameModelEffect::ShiftCamera {
+                direction: Vector3::new(0.0, 0.0, 0.05),
+            }),
+            (A, Released) => Some(GameModelEffect::ShiftCamera {
+                direction: Vector3::new(-0.05, 0.0, 0.0),
+            }),
+            (S, Released) => Some(GameModelEffect::ShiftCamera {
+                direction: Vector3::new(0.0, 0.0, -0.05),
+            }),
+            (D, Released) => Some(GameModelEffect::ShiftCamera {
+                direction: Vector3::new(0.05, 0.0, 0.0),
+            }),
+            (R, Released) => Some(GameModelEffect::ShiftCamera {
+                direction: Vector3::new(0.0, 0.05, 0.0),
+            }),
+            (F, Released) => Some(GameModelEffect::ShiftCamera {
+                direction: Vector3::new(0.0, -0.05, 0.0),
+            }),
+            (Tab, Released) => Some(GameModelEffect::Debug),
+            _ => None,
         }
     }
 }

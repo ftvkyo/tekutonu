@@ -12,8 +12,9 @@ pub mod vs {
             } uniforms;
 
             void main() {
+                vec4 position = vec4(position.x, -position.y, position.z, 1);
                 mat4 worldview = uniforms.view * uniforms.world;
-                gl_Position = uniforms.proj * worldview * vec4(position, 1.0);
+                gl_Position = uniforms.proj * worldview * position;
             }
         ",
         types_meta: {

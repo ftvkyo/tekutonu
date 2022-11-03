@@ -8,6 +8,9 @@ use winit::event_loop::EventLoop;
 
 
 fn main() {
+    // Erase everything in the terminal ;)
+    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
+
     tracing_subscriber::fmt()
         .with_span_events(FmtSpan::ACTIVE)
         .init();

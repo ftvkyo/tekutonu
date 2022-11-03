@@ -1,6 +1,6 @@
 use std::{f32::consts::FRAC_PI_2, sync::Arc};
 
-use cgmath::{InnerSpace, Matrix4, One, Rad, Vector3};
+use cgmath::{Matrix4, One, Rad, Vector3};
 use tracing::instrument;
 use vulkano::{
     buffer::{
@@ -41,7 +41,7 @@ use vulkano_win::create_surface_from_winit;
 use winit::{
     dpi::{PhysicalSize, Size},
     error::ExternalError,
-    event::{DeviceEvent, ElementState, Event, KeyboardInput, ModifiersState, WindowEvent},
+    event::{DeviceEvent, Event, KeyboardInput, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::{CursorGrabMode, Window},
 };
@@ -208,12 +208,7 @@ impl GameView {
         camera: &Camera,
     ) -> Arc<CpuBufferPoolSubbuffer<super::shaders::vs::ty::Data>> {
         let position = camera.position.map(|v| v as f32);
-
-        let direction_y = f32::sin(camera.pitch.0);
-        // Scale horizontal coordinates down to how much they matter based on the pitch
-        let direction_x = f32::cos(camera.yaw.0) * f32::cos(camera.pitch.0);
-        let direction_z = f32::sin(camera.yaw.0) * f32::cos(camera.pitch.0);
-        let direction = Vector3::new(-direction_x, -direction_y, -direction_z).normalize();
+        let direction = camera.get_look().map(|v| v as f32);
 
         let aspect_ratio =
             self.swapchain.image_extent()[0] as f32 / self.swapchain.image_extent()[1] as f32;
@@ -266,6 +261,9 @@ impl GameView {
     pub fn run(mut self, mut game: GameModel, input: GameInput) {
         let event_loop = self.event_loop.take().unwrap();
 
+        self.set_cursor_hidden(true);
+        self.set_cursor_locked(true).unwrap();
+
         let allocator_memory = Arc::new(StandardMemoryAllocator::new_default(self.device.clone()));
         let allocator_descriptor_set =
             Arc::new(StandardDescriptorSetAllocator::new(self.device.clone()));
@@ -273,8 +271,6 @@ impl GameView {
             self.device.clone(),
             Default::default(),
         ));
-
-        let mut modifiers = ModifiersState::default();
 
         // Describe our square
         let vertex_buffer = super::make_vertex_buffer(allocator_memory.clone());
@@ -297,13 +293,17 @@ impl GameView {
                     WindowEvent::KeyboardInput {
                         input:
                             KeyboardInput {
-                                state: ElementState::Released,
+                                state,
                                 virtual_keycode: Some(key),
                                 ..
                             },
                         ..
-                    } => input.process_keyboard_input(&self, key, control_flow),
-                    WindowEvent::ModifiersChanged(m) => modifiers = m,
+                    } => {
+                        let effect = input.keyboard(&self, key, state, control_flow);
+                        if let Some(effect) = effect {
+                            game.apply_effect(effect);
+                        }
+                    },
                     _ => (),
                 },
                 Event::DeviceEvent {
