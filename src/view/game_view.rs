@@ -10,29 +10,34 @@ use vulkano::{
         TypedBufferAccess,
     },
     command_buffer::{
+        allocator::StandardCommandBufferAllocator,
         AutoCommandBufferBuilder,
         CommandBufferUsage,
         PrimaryAutoCommandBuffer,
         RenderPassBeginInfo,
         SubpassContents,
     },
-    descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet},
+    descriptor_set::{
+        allocator::StandardDescriptorSetAllocator,
+        PersistentDescriptorSet,
+        WriteDescriptorSet,
+    },
     device::{Device, Queue},
     instance::Instance,
-    memory::pool::StandardMemoryPool,
+    memory::allocator::StandardMemoryAllocator,
     pipeline::{graphics::viewport::Viewport, GraphicsPipeline, Pipeline, PipelineBindPoint},
     render_pass::{Framebuffer, RenderPass},
     swapchain::{
         acquire_next_image,
         AcquireError,
-        PresentInfo,
-        Surface,
         Swapchain,
         SwapchainCreateInfo,
         SwapchainCreationError,
+        SwapchainPresentInfo,
     },
     sync::{self, FlushError, GpuFuture},
 };
+use vulkano_win::create_surface_from_winit;
 use winit::{
     dpi::{PhysicalSize, Size},
     error::ExternalError,
@@ -51,8 +56,8 @@ use crate::{
 pub struct GameView {
     device: Arc<Device>,
     queues: Vec<Arc<Queue>>,
-    surface: Arc<Surface<Window>>,
-    swapchain: Arc<Swapchain<Window>>,
+    window: Arc<Window>,
+    swapchain: Arc<Swapchain>,
     render_pass: Arc<RenderPass>,
     pipeline: Arc<GraphicsPipeline>,
     viewport: Viewport,
@@ -64,25 +69,23 @@ pub struct GameView {
 impl GameView {
     #[instrument(skip_all)]
     pub fn new(vk: Arc<Instance>, event_loop: EventLoop<()>) -> Self {
-        use vulkano_win::VkSurfaceBuild;
-        use winit::window::WindowBuilder;
-
-        let surface = WindowBuilder::new()
+        let window_builder = winit::window::WindowBuilder::new()
             .with_resizable(false)
             .with_inner_size(Size::Physical(PhysicalSize {
                 width: 1920,
                 height: 1080,
             }))
             // .with_fullscreen(Some(winit::window::Fullscreen::Borderless(None)))
-            .with_title("tekutonu")
-            .build_vk_surface(&event_loop, vk.clone())
-            .unwrap();
+            .with_title("tekutonu");
+
+        let window = Arc::new(window_builder.build(&event_loop).unwrap());
+        let surface = create_surface_from_winit(window.clone(), vk.clone()).unwrap();
 
         let (device, queues) = super::device::choose_device_and_queue(vk, surface.clone());
 
         // Allocating color (image) buffers through creating a swapchain.
         let (swapchain, images) =
-            super::swapchain::make_swapchain_and_images(device.clone(), surface.clone());
+            super::swapchain::make_swapchain_and_images(device.clone(), window.clone(), surface);
 
         // Describe where the output of the graphics pipeline will go by creating a
         // RenderPass.
@@ -116,7 +119,7 @@ impl GameView {
         Self {
             device,
             queues,
-            surface,
+            window,
             swapchain,
             render_pass,
             pipeline,
@@ -129,12 +132,13 @@ impl GameView {
     fn build_command_buffer(
         &mut self,
         image_num: usize,
+        allocator: Arc<StandardCommandBufferAllocator>,
         descriptor_set: Arc<PersistentDescriptorSet>,
         vertex_buffer: Arc<CpuAccessibleBuffer<[Vertex]>>,
         index_buffer: Arc<CpuAccessibleBuffer<[u16]>>,
     ) -> PrimaryAutoCommandBuffer {
         let mut builder = AutoCommandBufferBuilder::primary(
-            self.device.clone(),
+            &allocator,
             // Can only use the command buffer with this queue
             self.queues[0].queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
@@ -175,7 +179,7 @@ impl GameView {
     fn recreate_swapchain(
         &mut self,
         dimensions: PhysicalSize<u32>,
-    ) -> Result<(Arc<Swapchain<Window>>, Vec<Arc<Framebuffer>>), ()> {
+    ) -> Result<(Arc<Swapchain>, Vec<Arc<Framebuffer>>), ()> {
         let (new_swapchain, new_images) = match self.swapchain.recreate(SwapchainCreateInfo {
             image_extent: dimensions.into(),
             ..self.swapchain.create_info()
@@ -202,7 +206,7 @@ impl GameView {
         &mut self,
         uniform_buffer_pool: CpuBufferPool<super::shaders::vs::ty::Data>,
         camera: &Camera,
-    ) -> Arc<CpuBufferPoolSubbuffer<super::shaders::vs::ty::Data, Arc<StandardMemoryPool>>> {
+    ) -> Arc<CpuBufferPoolSubbuffer<super::shaders::vs::ty::Data>> {
         let position = camera.position.map(|v| v as f32);
 
         let direction_y = f32::sin(camera.pitch.0);
@@ -244,10 +248,10 @@ impl GameView {
         } else {
             CursorGrabMode::None
         };
-        let res = self.surface.window().set_cursor_grab(grab);
+        let res = self.window.set_cursor_grab(grab);
 
         if res.is_err() && locked {
-            self.surface.window().set_cursor_grab(CursorGrabMode::Confined)
+            self.window.set_cursor_grab(CursorGrabMode::Confined)
         } else {
             res
         }
@@ -255,21 +259,29 @@ impl GameView {
 
     #[instrument(skip_all)]
     pub fn set_cursor_hidden(&self, hidden: bool) {
-        self.surface.window().set_cursor_visible(!hidden)
+        self.window.set_cursor_visible(!hidden)
     }
 
     #[instrument(skip_all)]
     pub fn run(mut self, mut game: GameModel, input: GameInput) {
         let event_loop = self.event_loop.take().unwrap();
 
+        let allocator_memory = Arc::new(StandardMemoryAllocator::new_default(self.device.clone()));
+        let allocator_descriptor_set =
+            Arc::new(StandardDescriptorSetAllocator::new(self.device.clone()));
+        let allocator_command = Arc::new(StandardCommandBufferAllocator::new(
+            self.device.clone(),
+            Default::default(),
+        ));
+
         let mut modifiers = ModifiersState::default();
 
         // Describe our square
-        let vertex_buffer = super::make_vertex_buffer(self.device.clone());
-        let index_buffer = super::make_index_buffer(self.device.clone());
+        let vertex_buffer = super::make_vertex_buffer(allocator_memory.clone());
+        let index_buffer = super::make_index_buffer(allocator_memory.clone());
 
         // Describe world rotation and camera position
-        let uniform_buffer_pool = super::make_uniforms_buffer(self.device.clone());
+        let uniform_buffer_pool = super::make_uniforms_buffer(allocator_memory);
 
         let mut should_recreate_swapchain = false;
 
@@ -304,7 +316,7 @@ impl GameView {
                 Event::RedrawEventsCleared => {
                     // Do not draw frame when screen dimensions are zero.
                     // On Windows, this can occur from minimizing the application.
-                    let dimensions = self.surface.window().inner_size();
+                    let dimensions = self.window.inner_size();
                     if dimensions.width == 0 || dimensions.height == 0 {
                         return;
                     }
@@ -332,6 +344,7 @@ impl GameView {
 
                     let pipeline_layout = self.pipeline.layout().set_layouts().get(0).unwrap();
                     let descriptor_set = PersistentDescriptorSet::new(
+                        &allocator_descriptor_set,
                         pipeline_layout.clone(),
                         [WriteDescriptorSet::buffer(0, uniform_buffer_subbuffer)],
                     )
@@ -356,7 +369,8 @@ impl GameView {
                     }
 
                     let command_buffer = self.build_command_buffer(
-                        image_num,
+                        image_num as usize,
+                        allocator_command.clone(),
                         descriptor_set,
                         vertex_buffer.clone(),
                         index_buffer.clone(),
@@ -371,10 +385,10 @@ impl GameView {
                         // Submit a present command at the end of the queue.
                         .then_swapchain_present(
                             self.queues[0].clone(),
-                            PresentInfo {
-                                index: image_num,
-                                ..PresentInfo::swapchain(self.swapchain.clone())
-                            },
+                            SwapchainPresentInfo::swapchain_image_index(
+                                self.swapchain.clone(),
+                                image_num,
+                            ),
                         )
                         .then_signal_fence_and_flush();
 

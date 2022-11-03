@@ -3,8 +3,8 @@ use std::sync::Arc;
 use bytemuck::{Pod, Zeroable};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer, CpuBufferPool},
-    device::Device,
     impl_vertex,
+    memory::allocator::{MemoryUsage, StandardMemoryAllocator},
 };
 
 pub mod instance;
@@ -27,7 +27,9 @@ pub struct Vertex {
 }
 impl_vertex!(Vertex, position);
 
-pub fn make_vertex_buffer(device: Arc<Device>) -> Arc<CpuAccessibleBuffer<[Vertex]>> {
+pub fn make_vertex_buffer(
+    allocator: Arc<StandardMemoryAllocator>,
+) -> Arc<CpuAccessibleBuffer<[Vertex]>> {
     let vertices = [
         Vertex {
             position: [-0.5, -0.5, 0.0],
@@ -44,7 +46,7 @@ pub fn make_vertex_buffer(device: Arc<Device>) -> Arc<CpuAccessibleBuffer<[Verte
     ];
 
     CpuAccessibleBuffer::from_iter(
-        device,
+        &allocator,
         BufferUsage {
             vertex_buffer: true,
             ..BufferUsage::empty()
@@ -55,11 +57,13 @@ pub fn make_vertex_buffer(device: Arc<Device>) -> Arc<CpuAccessibleBuffer<[Verte
     .unwrap()
 }
 
-pub fn make_index_buffer(device: Arc<Device>) -> Arc<CpuAccessibleBuffer<[u16]>> {
+pub fn make_index_buffer(
+    allocator: Arc<StandardMemoryAllocator>,
+) -> Arc<CpuAccessibleBuffer<[u16]>> {
     let indices = [0, 1, 2, 0, 2, 3];
 
     CpuAccessibleBuffer::from_iter(
-        device,
+        &allocator,
         BufferUsage {
             index_buffer: true,
             ..BufferUsage::empty()
@@ -70,12 +74,15 @@ pub fn make_index_buffer(device: Arc<Device>) -> Arc<CpuAccessibleBuffer<[u16]>>
     .unwrap()
 }
 
-pub fn make_uniforms_buffer(device: Arc<Device>) -> CpuBufferPool<shaders::vs::ty::Data> {
+pub fn make_uniforms_buffer(
+    allocator: Arc<StandardMemoryAllocator>,
+) -> CpuBufferPool<shaders::vs::ty::Data> {
     CpuBufferPool::<shaders::vs::ty::Data>::new(
-        device,
+        allocator,
         BufferUsage {
             uniform_buffer: true,
             ..BufferUsage::empty()
         },
+        MemoryUsage::Upload,
     )
 }
