@@ -33,7 +33,7 @@ use vulkano::{
     sync::{self, FlushError, GpuFuture},
 };
 use winit::{
-    dpi::PhysicalSize,
+    dpi::{PhysicalSize, Size},
     error::ExternalError,
     event::{DeviceEvent, ElementState, Event, KeyboardInput, ModifiersState, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -67,11 +67,11 @@ impl GameView {
 
         let surface = WindowBuilder::new()
             .with_resizable(false)
-            // .with_inner_size(Size::Physical(PhysicalSize {
-            //     width: 1920,
-            //     height: 1080,
-            // }))
-            .with_fullscreen(Some(winit::window::Fullscreen::Borderless(None)))
+            .with_inner_size(Size::Physical(PhysicalSize {
+                width: 1920,
+                height: 1080,
+            }))
+            // .with_fullscreen(Some(winit::window::Fullscreen::Borderless(None)))
             .with_title("tekutonu")
             .build_vk_surface(&event_loop, vk.clone())
             .unwrap();
@@ -240,7 +240,13 @@ impl GameView {
         } else {
             CursorGrabMode::None
         };
-        self.surface.window().set_cursor_grab(grab)
+        let res = self.surface.window().set_cursor_grab(grab);
+
+        if res.is_err() && locked {
+            self.surface.window().set_cursor_grab(CursorGrabMode::Confined)
+        } else {
+            res
+        }
     }
 
     pub fn set_cursor_hidden(&self, hidden: bool) {
