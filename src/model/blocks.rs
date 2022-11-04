@@ -1,18 +1,18 @@
 use super::{consts as c, types as t};
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum BlockKind {
     Air,
     Stone,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Block {
     pub kind: BlockKind,
 }
 
-impl Default for Block {
-    fn default() -> Self {
+impl Block {
+    pub fn air() -> Self {
         Self {
             kind: BlockKind::Air,
         }
@@ -21,13 +21,13 @@ impl Default for Block {
 
 #[derive(Clone)]
 pub struct Chunk {
-    blocks: Vec<Block>,
+    blocks: [Block; c::CHUNK_TOTAL_BLOCKS],
 }
 
 impl Chunk {
     pub fn new() -> Self {
         Self {
-            blocks: vec![Block::default(); c::CHUNK_TOTAL_BLOCKS],
+            blocks: [Block::air(); c::CHUNK_TOTAL_BLOCKS],
         }
     }
 
@@ -38,6 +38,10 @@ impl Chunk {
 
     pub fn get_block<'s>(&'s self, location: t::PointInt) -> &'s Block {
         &self.blocks[Self::generate_index(location)]
+    }
+
+    pub fn get_block_mut(&mut self, location: t::PointInt) -> &mut Block {
+        &mut self.blocks[Self::generate_index(location)]
     }
 
     pub fn set_block(&mut self, location: t::PointInt, block: Block) {
@@ -51,6 +55,7 @@ pub struct Region {
 
 impl Region {
     pub fn new() -> Self {
+
         Self {
             chunks: vec![Chunk::new(); c::REGION_TOTAL_CHUNKS],
         }
@@ -63,6 +68,10 @@ impl Region {
 
     pub fn get_chunk<'s>(&'s self, location: t::PointInt) -> &'s Chunk {
         &self.chunks[Self::generate_index(location)]
+    }
+
+    pub fn get_chunk_mut(&mut self, location: t::PointInt) -> &mut Chunk {
+        &mut self.chunks[Self::generate_index(location)]
     }
 
     pub fn set_chunk(&mut self, location: t::PointInt, chunk: Chunk) {

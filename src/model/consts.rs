@@ -1,4 +1,4 @@
-const CHUNK_EDGE_BLOCKS: usize = 32;
+const CHUNK_EDGE_BLOCKS: usize = 16;
 pub const CHUNK_X_BLOCKS: usize = CHUNK_EDGE_BLOCKS;
 pub const CHUNK_Y_BLOCKS: usize = CHUNK_EDGE_BLOCKS;
 pub const CHUNK_Z_BLOCKS: usize = CHUNK_EDGE_BLOCKS;

@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
 use vulkano::{device::Device, render_pass::RenderPass, swapchain::Swapchain};
-use winit::window::Window;
 
-pub fn make_render_pass(device: Arc<Device>, swapchain: Arc<Swapchain<Window>>) -> Arc<RenderPass> {
+pub fn make_render_pass(device: Arc<Device>, swapchain: Arc<Swapchain>) -> Arc<RenderPass> {
     vulkano::single_pass_renderpass!(
         device,
         // TODO: read about attachments

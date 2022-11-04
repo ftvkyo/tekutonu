@@ -12,12 +12,11 @@ use vulkano::{
     instance::Instance,
     swapchain::Surface,
 };
-use winit::window::Window;
 
 
 pub fn choose_device_and_queue(
     instance: Arc<Instance>,
-    surface: Arc<Surface<Window>>,
+    surface: Arc<Surface>,
 ) -> (Arc<Device>, Vec<Arc<Queue>>) {
     // TODO: check out what other extensions are there
     let device_extensions = DeviceExtensions {

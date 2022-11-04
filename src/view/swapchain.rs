@@ -9,8 +9,9 @@ use winit::window::Window;
 
 pub fn make_swapchain_and_images(
     device: Arc<Device>,
-    surface: Arc<Surface<Window>>,
-) -> (Arc<Swapchain<Window>>, Vec<Arc<SwapchainImage<Window>>>) {
+    window: Arc<Window>,
+    surface: Arc<Surface>,
+) -> (Arc<Swapchain>, Vec<Arc<SwapchainImage>>) {
     // We will only be allowed to request capabilities that are supported by the
     // surface
     let surface_capabilities = device
@@ -30,7 +31,7 @@ pub fn make_swapchain_and_images(
     // Size of image buffers of the swapchain
     let swap_extent = match surface_capabilities.current_extent {
         Some(extent) => extent,
-        None => surface.window().inner_size().into(),
+        None => window.inner_size().into(),
     };
 
     Swapchain::new(

@@ -9,7 +9,10 @@ bytemuck = "1.12"
 
 cgmath = "0.18"
 
-vulkano = "0.31"
-vulkano-shaders = "0.31"
-vulkano-win = "0.31"
+vulkano = "0.32"
+vulkano-shaders = "0.32"
+vulkano-win = "0.32"
 winit = "0.27"
+
+tracing = "0.1"
+tracing-subscriber = "0.3"
