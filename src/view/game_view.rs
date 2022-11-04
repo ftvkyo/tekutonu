@@ -1,4 +1,4 @@
-use std::{f32::consts::FRAC_PI_2, sync::Arc};
+use std::{f32::consts::FRAC_PI_2, sync::Arc, time::Instant};
 
 use cgmath::{Matrix4, One, Rad, Vector3};
 use tracing::instrument;
@@ -258,7 +258,7 @@ impl GameView {
     }
 
     #[instrument(skip_all)]
-    pub fn run(mut self, mut game: GameModel, input: GameInput) {
+    pub fn run(mut self, mut game: GameModel, mut input: GameInput) {
         let event_loop = self.event_loop.take().unwrap();
 
         self.set_cursor_hidden(true);
@@ -285,7 +285,16 @@ impl GameView {
         // wait.
         let mut previous_frame_end = Some(sync::now(self.device.clone()).boxed());
 
+        let mut last_tick = Instant::now();
+
         event_loop.run(move |event, _, control_flow| {
+            if last_tick.elapsed().as_millis() > 16 {
+                if let Some(effect) = input.tick() {
+                    game.apply_effect(effect);
+                }
+                last_tick = Instant::now();
+            }
+
             match event {
                 Event::WindowEvent { event, .. } => match event {
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
@@ -299,8 +308,7 @@ impl GameView {
                             },
                         ..
                     } => {
-                        let effect = input.keyboard(&self, key, state, control_flow);
-                        if let Some(effect) = effect {
+                        if let Some(effect) = input.keyboard(key, state, control_flow) {
                             game.apply_effect(effect);
                         }
                     },

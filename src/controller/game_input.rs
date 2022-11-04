@@ -1,19 +1,23 @@
-use std::f64::consts::FRAC_PI_2;
+use std::{f64::consts::FRAC_PI_2, collections::HashSet};
 
-use cgmath::{Rad, Vector3};
+use cgmath::{Rad, Vector3, Zero};
 use winit::{
     event::{ElementState, VirtualKeyCode},
     event_loop::ControlFlow,
 };
 
-use crate::{model::effect::GameModelEffect, view::GameView};
+use crate::{model::effect::GameModelEffect};
 
 
-pub struct GameInput {}
+pub struct GameInput {
+    keys_held: HashSet<VirtualKeyCode>,
+}
 
 impl GameInput {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            keys_held: HashSet::new(),
+        }
     }
 
     pub fn mouse_movement(&self, delta: (f64, f64)) -> GameModelEffect {
@@ -26,40 +30,77 @@ impl GameInput {
     }
 
     pub fn keyboard(
-        &self,
-        _view: &GameView,
+        &mut self,
         key: VirtualKeyCode,
         state: ElementState,
         control_flow: &mut ControlFlow,
     ) -> Option<GameModelEffect> {
         use winit::event::{ElementState::*, VirtualKeyCode::*};
 
-
         match (key, state) {
             (Escape, Released) => {
                 control_flow.set_exit();
                 None
             },
-            (W, Released) => Some(GameModelEffect::ShiftCamera {
+            (Tab, Released) => Some(GameModelEffect::Debug),
+            (W | A | S | D | R | F, Pressed) => {
+                self.keys_held.insert(key);
+                None
+            },
+            (W | A | S | D | R | F, Released) => {
+                self.keys_held.remove(&key);
+                None
+            },
+            _ => None,
+        }
+    }
+
+    fn keyboard_held(
+        key: &VirtualKeyCode,
+    ) -> Option<GameModelEffect> {
+        use winit::event::VirtualKeyCode::*;
+
+        match key {
+            W => Some(GameModelEffect::ShiftCamera {
                 direction: Vector3::new(0.0, 0.0, 0.05),
             }),
-            (A, Released) => Some(GameModelEffect::ShiftCamera {
+            A => Some(GameModelEffect::ShiftCamera {
                 direction: Vector3::new(-0.05, 0.0, 0.0),
             }),
-            (S, Released) => Some(GameModelEffect::ShiftCamera {
+            S => Some(GameModelEffect::ShiftCamera {
                 direction: Vector3::new(0.0, 0.0, -0.05),
             }),
-            (D, Released) => Some(GameModelEffect::ShiftCamera {
+            D => Some(GameModelEffect::ShiftCamera {
                 direction: Vector3::new(0.05, 0.0, 0.0),
             }),
-            (R, Released) => Some(GameModelEffect::ShiftCamera {
+            R => Some(GameModelEffect::ShiftCamera {
                 direction: Vector3::new(0.0, 0.05, 0.0),
             }),
-            (F, Released) => Some(GameModelEffect::ShiftCamera {
+            F => Some(GameModelEffect::ShiftCamera {
                 direction: Vector3::new(0.0, -0.05, 0.0),
             }),
-            (Tab, Released) => Some(GameModelEffect::Debug),
-            _ => None,
+            _ => None
+        }
+    }
+
+    pub fn tick(
+        &self,
+    ) -> Option<GameModelEffect> {
+        let mut camera_shift_acc = None;
+
+        for key in self.keys_held.iter() {
+            match Self::keyboard_held(key) {
+                Some(GameModelEffect::ShiftCamera { direction }) => {
+                    camera_shift_acc = Some(camera_shift_acc.unwrap_or(Vector3::zero()) + direction);
+                },
+                _ => (),
+            }
+        }
+
+        if let Some(direction) = camera_shift_acc {
+            Some(GameModelEffect::ShiftCamera { direction })
+        } else {
+            None
         }
     }
 }
