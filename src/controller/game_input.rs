@@ -1,4 +1,4 @@
-use std::{f64::consts::FRAC_PI_2, collections::HashSet};
+use std::{collections::HashSet, f64::consts::FRAC_PI_2};
 
 use cgmath::{Rad, Vector3, Zero};
 use winit::{
@@ -6,7 +6,7 @@ use winit::{
     event_loop::ControlFlow,
 };
 
-use crate::{model::effect::GameModelEffect};
+use crate::model::effect::GameModelEffect;
 
 
 pub struct GameInput {
@@ -55,9 +55,7 @@ impl GameInput {
         }
     }
 
-    fn keyboard_held(
-        key: &VirtualKeyCode,
-    ) -> Option<GameModelEffect> {
+    fn keyboard_held(key: &VirtualKeyCode) -> Option<GameModelEffect> {
         use winit::event::VirtualKeyCode::*;
 
         match key {
@@ -79,28 +77,23 @@ impl GameInput {
             F => Some(GameModelEffect::ShiftCamera {
                 direction: Vector3::new(0.0, -0.05, 0.0),
             }),
-            _ => None
+            _ => None,
         }
     }
 
-    pub fn tick(
-        &self,
-    ) -> Option<GameModelEffect> {
+    pub fn tick(&self) -> Option<GameModelEffect> {
         let mut camera_shift_acc = None;
 
         for key in self.keys_held.iter() {
             match Self::keyboard_held(key) {
                 Some(GameModelEffect::ShiftCamera { direction }) => {
-                    camera_shift_acc = Some(camera_shift_acc.unwrap_or(Vector3::zero()) + direction);
+                    camera_shift_acc =
+                        Some(camera_shift_acc.unwrap_or(Vector3::zero()) + direction);
                 },
                 _ => (),
             }
         }
 
-        if let Some(direction) = camera_shift_acc {
-            Some(GameModelEffect::ShiftCamera { direction })
-        } else {
-            None
-        }
+        camera_shift_acc.map(|direction| GameModelEffect::ShiftCamera { direction })
     }
 }

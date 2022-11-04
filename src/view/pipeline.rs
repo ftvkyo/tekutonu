@@ -14,7 +14,7 @@ use vulkano::{
     shader::ShaderModule,
 };
 
-use super::Vertex;
+use super::data::Vertex;
 
 pub fn make_pipeline(
     device: Arc<Device>,

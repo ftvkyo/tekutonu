@@ -46,7 +46,7 @@ use winit::{
     window::{CursorGrabMode, Window},
 };
 
-use super::Vertex;
+use super::data::Vertex;
 use crate::{
     controller::GameInput,
     model::{Camera, GameModel},
@@ -273,11 +273,11 @@ impl GameView {
         ));
 
         // Describe our square
-        let vertex_buffer = super::make_vertex_buffer(allocator_memory.clone());
-        let index_buffer = super::make_index_buffer(allocator_memory.clone());
+        let (v_buffer, i_buffer) =
+            super::data::make_vertex_and_index_buffers(allocator_memory.clone(), &game);
 
         // Describe world rotation and camera position
-        let uniform_buffer_pool = super::make_uniforms_buffer(allocator_memory);
+        let uniform_buffer_pool = super::data::make_uniforms_buffer(allocator_memory);
 
         let mut should_recreate_swapchain = false;
 
@@ -380,8 +380,8 @@ impl GameView {
                         image_num as usize,
                         allocator_command.clone(),
                         descriptor_set,
-                        vertex_buffer.clone(),
-                        index_buffer.clone(),
+                        v_buffer.clone(),
+                        i_buffer.clone(),
                     );
 
                     let future = previous_frame_end
