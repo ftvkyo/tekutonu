@@ -1,18 +1,18 @@
 use super::{consts as c, types as t};
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum BlockKind {
     Air,
     Stone,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Block {
     pub kind: BlockKind,
 }
 
-impl Default for Block {
-    fn default() -> Self {
+impl Block {
+    pub fn air() -> Self {
         Self {
             kind: BlockKind::Air,
         }
@@ -21,13 +21,13 @@ impl Default for Block {
 
 #[derive(Clone)]
 pub struct Chunk {
-    blocks: Vec<Block>,
+    blocks: [Block; c::CHUNK_TOTAL_BLOCKS],
 }
 
 impl Chunk {
     pub fn new() -> Self {
         Self {
-            blocks: vec![Block::default(); c::CHUNK_TOTAL_BLOCKS],
+            blocks: [Block::air(); c::CHUNK_TOTAL_BLOCKS],
         }
     }
 
@@ -55,6 +55,7 @@ pub struct Region {
 
 impl Region {
     pub fn new() -> Self {
+
         Self {
             chunks: vec![Chunk::new(); c::REGION_TOTAL_CHUNKS],
         }
