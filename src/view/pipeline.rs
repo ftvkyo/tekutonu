@@ -4,11 +4,14 @@ use vulkano::{
     device::Device,
     pipeline::{
         graphics::{
+            depth_stencil::DepthStencilState,
             input_assembly::InputAssemblyState,
+            rasterization::{CullMode, FrontFace, RasterizationState},
             vertex_input::BuffersDefinition,
             viewport::ViewportState,
         },
         GraphicsPipeline,
+        StateMode,
     },
     render_pass::{RenderPass, Subpass},
     shader::ShaderModule,
@@ -23,16 +26,23 @@ pub fn make_pipeline(
     fs: Arc<ShaderModule>,
 ) -> Arc<GraphicsPipeline> {
     GraphicsPipeline::start()
-        // Which subpass of which render pass this pipeline is going to be used in.
-        .render_pass(Subpass::from(render_pass, 0).unwrap())
         // How the vertices are laid out.
         .vertex_input_state(BuffersDefinition::new().vertex::<Vertex>())
+        .vertex_shader(vs.entry_point("main").unwrap(), ())
+        .rasterization_state(RasterizationState {
+            // polygon_mode: todo!(),
+            front_face: StateMode::Fixed(FrontFace::Clockwise),
+            cull_mode: StateMode::Fixed(CullMode::Back),
+            ..Default::default()
+        })
         // The content of the vertex buffer describes a list of triangles.
         .input_assembly_state(InputAssemblyState::new())
-        .vertex_shader(vs.entry_point("main").unwrap(), ())
         // Use a resizable viewport set to draw over the entire window
         .viewport_state(ViewportState::viewport_dynamic_scissor_irrelevant())
         .fragment_shader(fs.entry_point("main").unwrap(), ())
+        .depth_stencil_state(DepthStencilState::simple_depth_test())
+        // Which subpass of which render pass this pipeline is going to be used in.
+        .render_pass(Subpass::from(render_pass, 0).unwrap())
         .build(device)
         .unwrap()
 }

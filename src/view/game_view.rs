@@ -52,7 +52,6 @@ use crate::{
     model::{Camera, GameModel},
 };
 
-
 pub struct GameView {
     device: Arc<Device>,
     queues: Vec<Arc<Queue>>,
@@ -62,6 +61,8 @@ pub struct GameView {
     pipeline: Arc<GraphicsPipeline>,
     viewport: Viewport,
     framebuffers: Vec<Arc<Framebuffer>>,
+
+    allocator_memory: Arc<StandardMemoryAllocator>,
 
     event_loop: Option<EventLoop<()>>,
 }
@@ -109,10 +110,16 @@ impl GameView {
             depth_range: 0.0..1.0,
         };
 
+        let allocator_memory = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
+
         // render_pass only specifies the layout of framebuffers, we need to actually
         // create them. We should create a separate framebuffer for every image.
-        let framebuffers =
-            super::framebuffer::make_framebuffers(&images, render_pass.clone(), &mut viewport);
+        let framebuffers = super::framebuffer::make_framebuffers(
+            &images,
+            render_pass.clone(),
+            &mut viewport,
+            allocator_memory.clone(),
+        );
 
         // End of initialization.
 
@@ -125,6 +132,7 @@ impl GameView {
             pipeline,
             viewport,
             framebuffers,
+            allocator_memory,
             event_loop: Some(event_loop),
         }
     }
@@ -150,7 +158,10 @@ impl GameView {
                 RenderPassBeginInfo {
                     // One item for each attachment in the render pass that have `LoadOp::Clear`
                     // (otherwise None)
-                    clear_values: vec![Some([0.0, 0.0, 0.0, 1.0].into())],
+                    clear_values: vec![
+                        Some([0.0, 0.0, 0.0, 1.0].into()), // Color
+                        Some(1f32.into()),                 // Depth
+                    ],
                     ..RenderPassBeginInfo::framebuffer(self.framebuffers[image_num].clone())
                 },
                 SubpassContents::Inline,
@@ -197,6 +208,7 @@ impl GameView {
             &new_images,
             self.render_pass.clone(),
             &mut self.viewport,
+            self.allocator_memory.clone(),
         );
 
         Ok((new_swapchain, new_framebuffers))
