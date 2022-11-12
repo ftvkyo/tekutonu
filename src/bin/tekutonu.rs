@@ -7,12 +7,17 @@ use tracing_subscriber::fmt::format::FmtSpan;
 use winit::event_loop::EventLoop;
 
 
-fn main() {
-    // Erase everything in the terminal ;)
+/// Erase everything in the terminal ;)
+fn terminal_clear() {
     print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
+}
+
+fn main() {
+    terminal_clear();
 
     tracing_subscriber::fmt()
         .with_span_events(FmtSpan::ACTIVE)
+        .with_timer(tracing_subscriber::fmt::time::uptime())
         .init();
 
     let vk = make_instance();

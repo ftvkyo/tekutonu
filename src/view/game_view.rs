@@ -46,12 +46,11 @@ use winit::{
     window::{CursorGrabMode, Window},
 };
 
-use super::Vertex;
+use super::data::Vertex;
 use crate::{
     controller::GameInput,
     model::{Camera, GameModel},
 };
-
 
 pub struct GameView {
     device: Arc<Device>,
@@ -62,6 +61,8 @@ pub struct GameView {
     pipeline: Arc<GraphicsPipeline>,
     viewport: Viewport,
     framebuffers: Vec<Arc<Framebuffer>>,
+
+    allocator_memory: Arc<StandardMemoryAllocator>,
 
     event_loop: Option<EventLoop<()>>,
 }
@@ -109,10 +110,16 @@ impl GameView {
             depth_range: 0.0..1.0,
         };
 
+        let allocator_memory = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
+
         // render_pass only specifies the layout of framebuffers, we need to actually
         // create them. We should create a separate framebuffer for every image.
-        let framebuffers =
-            super::framebuffer::make_framebuffers(&images, render_pass.clone(), &mut viewport);
+        let framebuffers = super::framebuffer::make_framebuffers(
+            &images,
+            render_pass.clone(),
+            &mut viewport,
+            allocator_memory.clone(),
+        );
 
         // End of initialization.
 
@@ -125,6 +132,7 @@ impl GameView {
             pipeline,
             viewport,
             framebuffers,
+            allocator_memory,
             event_loop: Some(event_loop),
         }
     }
@@ -150,7 +158,10 @@ impl GameView {
                 RenderPassBeginInfo {
                     // One item for each attachment in the render pass that have `LoadOp::Clear`
                     // (otherwise None)
-                    clear_values: vec![Some([0.0, 0.0, 0.0, 1.0].into())],
+                    clear_values: vec![
+                        Some([0.0, 0.0, 0.0, 1.0].into()), // Color
+                        Some(1f32.into()),                 // Depth
+                    ],
                     ..RenderPassBeginInfo::framebuffer(self.framebuffers[image_num].clone())
                 },
                 SubpassContents::Inline,
@@ -197,6 +208,7 @@ impl GameView {
             &new_images,
             self.render_pass.clone(),
             &mut self.viewport,
+            self.allocator_memory.clone(),
         );
 
         Ok((new_swapchain, new_framebuffers))
@@ -273,11 +285,11 @@ impl GameView {
         ));
 
         // Describe our square
-        let vertex_buffer = super::make_vertex_buffer(allocator_memory.clone());
-        let index_buffer = super::make_index_buffer(allocator_memory.clone());
+        let (v_buffer, i_buffer) =
+            super::data::make_vertex_and_index_buffers(allocator_memory.clone(), &game);
 
         // Describe world rotation and camera position
-        let uniform_buffer_pool = super::make_uniforms_buffer(allocator_memory);
+        let uniform_buffer_pool = super::data::make_uniforms_buffer(allocator_memory);
 
         let mut should_recreate_swapchain = false;
 
@@ -380,8 +392,8 @@ impl GameView {
                         image_num as usize,
                         allocator_command.clone(),
                         descriptor_set,
-                        vertex_buffer.clone(),
-                        index_buffer.clone(),
+                        v_buffer.clone(),
+                        i_buffer.clone(),
                     );
 
                     let future = previous_frame_end

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use vulkano::{device::Device, render_pass::RenderPass, swapchain::Swapchain};
+use vulkano::{device::Device, format::Format, render_pass::RenderPass, swapchain::Swapchain};
 
 pub fn make_render_pass(device: Arc<Device>, swapchain: Arc<Swapchain>) -> Arc<RenderPass> {
     vulkano::single_pass_renderpass!(
@@ -16,14 +16,22 @@ pub fn make_render_pass(device: Arc<Device>, swapchain: Arc<Swapchain>) -> Arc<R
                 format: swapchain.image_format(),
                 // Don't do multisampling, we don't want antialiasing (yet)
                 samples: 1,
+            },
+            depth: {
+                load: Clear,
+                store: DontCare,
+                // TODO: check if it is actually available
+                format: Format::D32_SFLOAT,
+                samples: 1,
             }
         },
         pass: {
             // Use the attachment named `color`
             color: [color],
-            // No depth-stencil attachment
-            // TODO: read about it
-            depth_stencil: {}
+            // Use the attachment named `depth`
+            depth_stencil: {
+                depth
+            }
         }
     )
     .unwrap()

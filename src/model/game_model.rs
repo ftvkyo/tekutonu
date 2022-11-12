@@ -4,8 +4,9 @@ use cgmath::{InnerSpace, Matrix4, Point3, Rad, Vector3};
 use tracing::instrument;
 
 use super::{
-    blocks::{Block, BlockKind, Region},
+    block::{Block, BlockKind},
     effect::GameModelEffect,
+    region::Region,
 };
 use crate::util::normalize_angle;
 
@@ -97,12 +98,28 @@ impl Default for GameModel {
     fn default() -> Self {
         let mut world = Region::new();
 
-        world.get_chunk_mut([0, 0, 0]).set_block(
-            [0, 0, 0],
-            Block {
-                kind: BlockKind::Stone,
-            },
-        );
+        let s = Block {
+            kind: BlockKind::Stone,
+        };
+
+        let c = world.get_chunk_mut([0, 0, 0]);
+
+        c.set_block([0, 0, 0], s);
+
+        // Orientation
+        c.set_block([3, 3, 3], s);
+        c.set_block([3, 3, 4], s);
+        c.set_block([3, 4, 3], s);
+        c.set_block([4, 3, 3], s);
+
+        // Smileyface
+        c.set_block([1, 2, 8], s);
+        c.set_block([2, 1, 8], s);
+        c.set_block([3, 1, 8], s);
+        c.set_block([4, 1, 8], s);
+        c.set_block([5, 2, 8], s);
+        c.set_block([2, 4, 8], s);
+        c.set_block([4, 4, 8], s);
 
         Self {
             camera: Default::default(),
