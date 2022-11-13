@@ -7,6 +7,7 @@ edition = "2021"
 
 bytemuck = "1.12"
 
+ndarray = "0.15"
 cgmath = "0.18"
 
 vulkano = "0.32"

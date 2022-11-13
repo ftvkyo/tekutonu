@@ -9,8 +9,8 @@ pub struct Block {
     pub kind: BlockKind,
 }
 
-impl Block {
-    pub fn air() -> Self {
+impl Default for Block {
+    fn default() -> Self {
         Self {
             kind: BlockKind::Air,
         }
