@@ -25,10 +25,13 @@ use vulkano::{
         WriteDescriptorSet,
     },
     device::{Device, Queue},
+    format::Format,
+    image::{view::ImageView, ImageDimensions, ImmutableImage, MipmapsCount},
     instance::Instance,
     memory::allocator::{MemoryUsage, StandardMemoryAllocator},
     pipeline::{graphics::viewport::Viewport, GraphicsPipeline, Pipeline, PipelineBindPoint},
     render_pass::{Framebuffer, RenderPass},
+    sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo},
     swapchain::{
         acquire_next_image,
         AcquireError,
@@ -37,7 +40,7 @@ use vulkano::{
         SwapchainCreationError,
         SwapchainPresentInfo,
     },
-    sync::{self, FlushError, GpuFuture}, image::{ImmutableImage, ImageDimensions, MipmapsCount, view::ImageView}, format::Format, sampler::{Sampler, SamplerCreateInfo, Filter, SamplerAddressMode},
+    sync::{self, FlushError, GpuFuture},
 };
 use vulkano_win::create_surface_from_winit;
 use winit::{
@@ -47,9 +50,9 @@ use winit::{
     window::{CursorGrabMode, Window},
 };
 
-use crate::model::GameModel;
-
+use self::data::Normal;
 use super::texture::Texture;
+use crate::model::GameModel;
 
 pub mod instance;
 
@@ -191,10 +194,11 @@ impl Renderer {
         .unwrap()
     }
 
-    fn make_texture(&self, builder: &mut ACBB, texture: &Texture) -> (
-        Arc<ImageView<ImmutableImage>>,
-        Arc<Sampler>,
-    ) {
+    fn make_texture(
+        &self,
+        builder: &mut ACBB,
+        texture: &Texture,
+    ) -> (Arc<ImageView<ImmutableImage>>, Arc<Sampler>) {
         let dimensions = ImageDimensions::Dim2d {
             width: texture.info.width,
             height: texture.info.height,
@@ -255,7 +259,7 @@ impl Renderer {
                 0,
                 ds,
             )
-            .bind_vertex_buffers(0, data.vertices.clone())
+            .bind_vertex_buffers(0, (data.vertices.clone(), data.normals.clone()))
             .bind_index_buffer(data.indices.clone())
             .draw_indexed(data.indices.len() as u32, 1, 0, 0, 0)
             .unwrap()
@@ -329,17 +333,18 @@ impl Renderer {
         self.pool_uniform.from_data(uniform_data).unwrap()
     }
 
-    fn make_vertices_and_indices(
+    fn make_vni(
         &self,
         game: &GameModel,
     ) -> (
         Arc<CpuAccessibleBuffer<[Vertex]>>,
+        Arc<CpuAccessibleBuffer<[Normal]>>,
         Arc<CpuAccessibleBuffer<[u16]>>,
     ) {
-        let (v, i) = game
+        let (v, n, i) = game
             .world
             .get_chunk([0, 0, 0])
-            .get_render_data([0.0, 0.0, 0.0]);
+            .get_render_data(Vector3::new(0.0, 0.0, 0.0));
 
         let v = CpuAccessibleBuffer::from_iter(
             &self.alloc_memory,
@@ -348,7 +353,18 @@ impl Renderer {
                 ..BufferUsage::empty()
             },
             false,
-            v.into_iter().map(|v| Vertex { position: v }),
+            v.into_iter().map(Vertex::from),
+        )
+        .unwrap();
+
+        let n = CpuAccessibleBuffer::from_iter(
+            &self.alloc_memory,
+            BufferUsage {
+                vertex_buffer: true,
+                ..BufferUsage::empty()
+            },
+            false,
+            n.into_iter().map(Normal::from),
         )
         .unwrap();
 
@@ -363,7 +379,7 @@ impl Renderer {
         )
         .unwrap();
 
-        (v, i)
+        (v, n, i)
     }
 
     #[instrument(skip_all)]
@@ -392,10 +408,11 @@ impl Renderer {
     }
 
     pub fn make_draw_data(&self, game: &GameModel) -> DrawData {
-        let (vertices, indices) = self.make_vertices_and_indices(game);
+        let (vertices, normals, indices) = self.make_vni(game);
         let uniforms = self.make_uniforms(game);
         DrawData {
             vertices,
+            normals,
             indices,
             uniforms,
         }
@@ -404,6 +421,7 @@ impl Renderer {
 
 pub struct DrawData {
     vertices: Arc<CpuAccessibleBuffer<[Vertex]>>,
+    normals: Arc<CpuAccessibleBuffer<[Normal]>>,
     indices: Arc<CpuAccessibleBuffer<[u16]>>,
     uniforms: Arc<CpuBufferPoolSubbuffer<shaders::vs::ty::Data>>,
 }
@@ -468,12 +486,8 @@ impl Renderer {
             self.should_recreate_swapchain = true;
         }
 
-        let command_buffer = self.build_command_buffer(
-            command_builder,
-            image_num as usize,
-            descriptor_set,
-            &data,
-        );
+        let command_buffer =
+            self.build_command_buffer(command_builder, image_num as usize, descriptor_set, data);
 
         let future = self
             .previous_frame_end

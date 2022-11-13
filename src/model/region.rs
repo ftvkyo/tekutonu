@@ -6,17 +6,7 @@ pub struct Region {
 }
 
 impl Region {
-    pub fn new() -> Self {
-        Self {
-            chunks: ndarray::Array3::default((
-                c::REGION_X_CHUNKS,
-                c::REGION_Y_CHUNKS,
-                c::REGION_Z_CHUNKS,
-            )),
-        }
-    }
-
-    pub fn get_chunk<'s>(&'s self, loc: t::PointIntLocal) -> &'s Chunk {
+    pub fn get_chunk(&self, loc: t::PointIntLocal) -> &Chunk {
         &self.chunks[loc]
     }
 
@@ -29,15 +19,26 @@ impl Region {
     }
 }
 
+impl Default for Region {
+    fn default() -> Self {
+        Self {
+            chunks: ndarray::Array3::default((
+                c::REGION_X_CHUNKS,
+                c::REGION_Y_CHUNKS,
+                c::REGION_Z_CHUNKS,
+            )),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::model::block::BlockKind;
-
     use super::*;
+    use crate::model::block::BlockKind;
 
     #[test]
     fn accessing_block() {
-        let reg = Region::new();
+        let reg = Region::default();
         let chunk = reg.get_chunk([1, 2, 3]);
         let block = chunk.get_block([1, 2, 3]);
 

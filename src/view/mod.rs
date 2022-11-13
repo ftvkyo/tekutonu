@@ -6,9 +6,8 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
 };
 
-use crate::{controller::GameInput, model::GameModel};
-
 use self::texture::TextureLoader;
+use crate::{controller::GameInput, model::GameModel};
 
 pub mod renderer;
 pub mod texture;
