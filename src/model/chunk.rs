@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use super::{
     block::{Block, BlockKind},
     consts as c,
@@ -42,52 +40,58 @@ impl Chunk {
         self.blocks[Self::to_index(location)] = block;
     }
 
-    fn assemble_triangles(&self) -> Vec<[t::PointIntGlobal; 3]> {
-        let mut triangles = Vec::<[t::PointIntGlobal; 3]>::new();
+    fn assemble_faces(&self) -> Vec<[t::PointIntGlobal; 4]> {
+        let mut faces = Vec::<[t::PointIntGlobal; 4]>::new();
 
         for (i, block) in self.blocks.iter().enumerate() {
             if block.kind == BlockKind::Stone {
                 let block_offset = Self::to_location(i);
-                for triangle in c::BLOCK_TRIANGLES {
-                    let triangle = triangle.map(|v| {
+                for face in c::BLOCK_FACES {
+                    let face = face.map(|v| {
                         [
                             v[0] + block_offset[0] as i64,
                             v[1] + block_offset[1] as i64,
                             v[2] + block_offset[2] as i64,
                         ]
                     });
-                    triangles.push(triangle);
+                    faces.push(face);
                 }
             }
         }
 
-        triangles
+        faces
     }
 
     pub fn get_render_data(&self, global_offset: [f32; 3]) -> (Vec<[f32; 3]>, Vec<usize>) {
-        let triangles = self.assemble_triangles();
+        let faces = self.assemble_faces();
 
         let to_f32 = |c| c as f32;
 
         let mut vertices = vec![];
         let mut indices = vec![];
-        let mut vertices_map: HashMap<t::PointIntGlobal, usize> = HashMap::new();
 
-        for triangle in triangles {
-            for v in triangle {
-                let index = vertices_map.entry(v).or_insert_with(|| {
-                    let v = v.map(to_f32);
-                    let v = [
-                        v[0] + global_offset[0],
-                        v[1] + global_offset[1],
-                        v[2] + global_offset[2],
-                    ];
-                    vertices.push(v);
-                    vertices.len() - 1
-                });
-                indices.push(*index);
-            }
+        for face in faces {
+            let i = vertices.len();
+            vertices.extend(face);
+
+            indices.push(i+0);
+            indices.push(i+1);
+            indices.push(i+2);
+            indices.push(i+0);
+            indices.push(i+2);
+            indices.push(i+3);
         }
+
+        let vertices = vertices.into_iter()
+            .map(|v| v.map(to_f32))
+            .map(|v| {
+                [
+                    v[0] + global_offset[0],
+                    v[1] + global_offset[1],
+                    v[2] + global_offset[2],
+                ]
+            })
+            .collect();
 
         (vertices, indices)
     }
@@ -197,16 +201,16 @@ mod tests {
         }
     }
 
-    mod assemble_triangles {
+    mod assemble_faces {
         use super::*;
 
         #[test]
         fn empty() {
             let chunk = Chunk::new();
 
-            let ts = chunk.assemble_triangles();
+            let ts = chunk.assemble_faces();
 
-            assert_eq!(ts.len(), 0, "there should be zero triangles generated");
+            assert_eq!(ts.len(), 0, "there should be zero faces generated");
         }
 
         #[test]
@@ -214,9 +218,9 @@ mod tests {
             let mut chunk = Chunk::new();
             chunk.get_block_mut([0, 0, 0]).kind = BlockKind::Stone;
 
-            let ts = chunk.assemble_triangles();
+            let ts = chunk.assemble_faces();
 
-            assert_eq!(ts.len(), 12, "there should be 12 triangles generated");
+            assert_eq!(ts.len(), 6, "there should be 6 faces generated");
         }
 
         #[test]
@@ -225,9 +229,9 @@ mod tests {
             chunk.get_block_mut([0, 0, 0]).kind = BlockKind::Stone;
             chunk.get_block_mut([0, 0, 1]).kind = BlockKind::Stone;
 
-            let ts = chunk.assemble_triangles();
+            let ts = chunk.assemble_faces();
 
-            assert_eq!(ts.len(), 24, "there should be 24 triangles generated");
+            assert_eq!(ts.len(), 12, "there should be 12 faces generated");
         }
     }
 }

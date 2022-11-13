@@ -17,32 +17,32 @@ pub const REGION_ONE_COLUMN_CHUNKS: usize = REGION_Y_CHUNKS;
 pub const REGION_ONE_SLICE_CHUNKS: usize = REGION_Y_CHUNKS * REGION_Z_CHUNKS;
 pub const REGION_TOTAL_CHUNKS: usize = REGION_X_CHUNKS * REGION_Y_CHUNKS * REGION_Z_CHUNKS;
 
-const BLOCK_POINTS: [super::types::PointIntGlobal; 8] = [
-    [0, 0, 0],
-    [0, 0, 1],
-    [0, 1, 0],
-    [0, 1, 1],
-    [1, 0, 0],
-    [1, 0, 1],
-    [1, 1, 0],
-    [1, 1, 1],
-];
+pub const BLOCK_FACES: [[super::types::PointIntGlobal; 4]; 6] = {
+    // l, r - left, right
+    // b, t - bottom, top
+    // n, f - near, far
 
-// Triangles of a cube, all clockwise if looking from outsid eof the cube
-pub const BLOCK_TRIANGLES: [[super::types::PointIntGlobal; 3]; 12] = {
-    let [a, b, c, d, e, f, g, h] = BLOCK_POINTS;
+    let [l, b, n] = [0, 0, 0];
+    let [r, t, f] = [1, 1, 1];
+
+    // Binary counting
+    let lbn = [l, b, n];
+    let lbf = [l, b, f];
+    let ltn = [l, t, n];
+    let ltf = [l, t, f];
+    let rbn = [r, b, n];
+    let rbf = [r, b, f];
+    let rtn = [r, t, n];
+    let rtf = [r, t, f];
+
+    // Encode block faces:
+    // front, left, back, right, bottom, top
     [
-        [a, c, g], // Front top
-        [a, g, e], // Front bottom
-        [b, d, c], // Left top
-        [b, c, a], // Left bottom
-        [f, h, d], // Back top
-        [f, d, b], // Back bottom
-        [e, g, h], // Right top
-        [e, h, f], // Right bottom
-        [c, d, h], // Top left
-        [c, h, g], // Top right
-        [e, b, a], // Bottom left
-        [e, f, b], // Bottom right
+        [lbn, rbn, rtn, ltn],
+        [lbf, lbn, ltn, ltf],
+        [rbf, lbf, ltf, rtf],
+        [rbn, rbf, rtf, rtn],
+        [lbf, rbf, rbn, lbn],
+        [ltn, rtn, rtf, ltf],
     ]
 };

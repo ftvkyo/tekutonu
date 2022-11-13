@@ -6,7 +6,7 @@ use vulkano::{
         graphics::{
             depth_stencil::DepthStencilState,
             input_assembly::InputAssemblyState,
-            rasterization::{CullMode, FrontFace, RasterizationState},
+            rasterization::{CullMode, RasterizationState},
             vertex_input::BuffersDefinition,
             viewport::ViewportState, color_blend::ColorBlendState,
         },
@@ -33,7 +33,6 @@ pub fn make_pipeline(
         .vertex_shader(vs.entry_point("main").unwrap(), ())
         .rasterization_state(RasterizationState {
             // polygon_mode: todo!(),
-            front_face: StateMode::Fixed(FrontFace::Clockwise),
             cull_mode: StateMode::Fixed(CullMode::Back),
             ..Default::default()
         })
