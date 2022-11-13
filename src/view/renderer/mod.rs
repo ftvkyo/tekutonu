@@ -341,10 +341,7 @@ type Vni = (
 );
 
 impl Renderer {
-    fn make_vni(
-        &self,
-        game: &GameModel,
-    ) -> Vni {
+    fn make_vni(&self, game: &GameModel) -> Vni {
         let (v, n, i) = game
             .world
             .get_chunk([0, 0, 0])

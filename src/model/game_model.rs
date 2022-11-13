@@ -5,6 +5,7 @@ use tracing::instrument;
 
 use super::{
     block::{Block, BlockKind},
+    consts,
     effect::GameModelEffect,
     region::Region,
 };
@@ -120,6 +121,12 @@ impl Default for GameModel {
         c.set_block([5, 2, 8], s);
         c.set_block([2, 4, 8], s);
         c.set_block([4, 4, 8], s);
+
+        for y in 0..consts::CHUNK_Y_BLOCKS {
+            for z in 0..consts::CHUNK_Z_BLOCKS {
+                c.set_block([consts::CHUNK_X_BLOCKS - 1, y, z], s);
+            }
+        }
 
         Self {
             camera: Default::default(),
