@@ -1,7 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use vulkano::{
-    impl_vertex,
-};
+use vulkano::impl_vertex;
 
 
 // How we are going to give data to the device

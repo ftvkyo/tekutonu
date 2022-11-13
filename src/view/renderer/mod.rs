@@ -1,13 +1,15 @@
 use std::{f32::consts::FRAC_PI_2, sync::Arc};
 
 use cgmath::{Matrix4, One, Rad, Vector3};
+use data::Vertex;
 use tracing::instrument;
 use vulkano::{
     buffer::{
         cpu_pool::CpuBufferPoolSubbuffer,
+        BufferUsage,
         CpuAccessibleBuffer,
         CpuBufferPool,
-        TypedBufferAccess, BufferUsage,
+        TypedBufferAccess,
     },
     command_buffer::{
         allocator::StandardCommandBufferAllocator,
@@ -24,7 +26,7 @@ use vulkano::{
     },
     device::{Device, Queue},
     instance::Instance,
-    memory::allocator::{StandardMemoryAllocator, MemoryUsage},
+    memory::allocator::{MemoryUsage, StandardMemoryAllocator},
     pipeline::{graphics::viewport::Viewport, GraphicsPipeline, Pipeline, PipelineBindPoint},
     render_pass::{Framebuffer, RenderPass},
     swapchain::{
@@ -35,20 +37,19 @@ use vulkano::{
         SwapchainCreationError,
         SwapchainPresentInfo,
     },
-    sync::{self, FlushError, GpuFuture},
+    sync::{self, FlushError, GpuFuture}, image::{ImmutableImage, ImageDimensions, MipmapsCount, view::ImageView}, format::Format, sampler::{Sampler, SamplerCreateInfo, Filter, SamplerAddressMode},
 };
 use vulkano_win::create_surface_from_winit;
 use winit::{
     dpi::{PhysicalSize, Size},
     error::ExternalError,
-    event_loop::{EventLoop},
+    event_loop::EventLoop,
     window::{CursorGrabMode, Window},
 };
 
-use data::Vertex;
-use crate::{
-    model::{GameModel},
-};
+use crate::model::GameModel;
+
+use super::texture::Texture;
 
 pub mod instance;
 
@@ -94,7 +95,7 @@ impl Renderer {
             // .with_fullscreen(Some(winit::window::Fullscreen::Borderless(None)))
             .with_title("tekutonu");
 
-        let window = Arc::new(window_builder.build(&event_loop).unwrap());
+        let window = Arc::new(window_builder.build(event_loop).unwrap());
         let surface = create_surface_from_winit(window.clone(), vk.clone()).unwrap();
 
         let (device, queues) = device::choose_device_and_queue(vk, surface.clone());
@@ -126,8 +127,7 @@ impl Renderer {
         };
 
         let alloc_memory = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
-        let alloc_ds =
-            Arc::new(StandardDescriptorSetAllocator::new(device.clone()));
+        let alloc_ds = Arc::new(StandardDescriptorSetAllocator::new(device.clone()));
         let alloc_command = Arc::new(StandardCommandBufferAllocator::new(
             device.clone(),
             Default::default(),
@@ -176,23 +176,63 @@ impl Renderer {
             previous_frame_end,
         }
     }
+}
 
-    fn build_command_buffer(
-        &mut self,
-        image_num: usize,
-        allocator: Arc<StandardCommandBufferAllocator>,
-        descriptor_set: Arc<PersistentDescriptorSet>,
-        vertex_buffer: Arc<CpuAccessibleBuffer<[Vertex]>>,
-        index_buffer: Arc<CpuAccessibleBuffer<[u16]>>,
-    ) -> PrimaryAutoCommandBuffer {
-        let mut builder = AutoCommandBufferBuilder::primary(
-            &allocator,
+type ACBB = AutoCommandBufferBuilder<PrimaryAutoCommandBuffer, Arc<StandardCommandBufferAllocator>>;
+
+impl Renderer {
+    fn make_command_builder(&self) -> ACBB {
+        AutoCommandBufferBuilder::primary(
+            &self.alloc_command.clone(),
             // Can only use the command buffer with this queue
             self.queues[0].queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
         )
+        .unwrap()
+    }
+
+    fn make_texture(&self, builder: &mut ACBB, texture: &Texture) -> (
+        Arc<ImageView<ImmutableImage>>,
+        Arc<Sampler>,
+    ) {
+        let dimensions = ImageDimensions::Dim2d {
+            width: texture.info.width,
+            height: texture.info.height,
+            array_layers: 1,
+        };
+
+        let image = ImmutableImage::from_iter(
+            &self.alloc_memory,
+            texture.bytes.clone(),
+            dimensions,
+            MipmapsCount::One,
+            Format::R8G8B8A8_SRGB,
+            builder,
+        )
+        .unwrap();
+        let texture = ImageView::new_default(image).unwrap();
+
+        let sampler = Sampler::new(
+            self.device.clone(),
+            SamplerCreateInfo {
+                mag_filter: Filter::Nearest,
+                min_filter: Filter::Nearest,
+                address_mode: [SamplerAddressMode::Repeat; 3],
+                ..Default::default()
+            },
+        )
         .unwrap();
 
+        (texture, sampler)
+    }
+
+    fn build_command_buffer(
+        &mut self,
+        mut builder: ACBB,
+        image_num: usize,
+        ds: Arc<PersistentDescriptorSet>,
+        data: &DrawData,
+    ) -> PrimaryAutoCommandBuffer {
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
@@ -213,11 +253,11 @@ impl Renderer {
                 PipelineBindPoint::Graphics,
                 self.pipeline.layout().clone(),
                 0,
-                descriptor_set,
+                ds,
             )
-            .bind_vertex_buffers(0, vertex_buffer)
-            .bind_index_buffer(index_buffer.clone())
-            .draw_indexed(index_buffer.len() as u32, 1, 0, 0, 0)
+            .bind_vertex_buffers(0, data.vertices.clone())
+            .bind_index_buffer(data.indices.clone())
+            .draw_indexed(data.indices.len() as u32, 1, 0, 0, 0)
             .unwrap()
             .end_render_pass()
             .unwrap();
@@ -291,7 +331,7 @@ impl Renderer {
 
     fn make_vertices_and_indices(
         &self,
-        game: &GameModel
+        game: &GameModel,
     ) -> (
         Arc<CpuAccessibleBuffer<[Vertex]>>,
         Arc<CpuAccessibleBuffer<[u16]>>,
@@ -369,7 +409,7 @@ pub struct DrawData {
 }
 
 impl Renderer {
-    pub fn draw(&mut self, data: &DrawData) {
+    pub fn draw(&mut self, data: &DrawData, texture: &Texture) {
         // Do not draw frame when screen dimensions are zero.
         // On Windows, this can occur from minimizing the application.
         let dimensions = self.window.inner_size();
@@ -395,11 +435,18 @@ impl Renderer {
             self.should_recreate_swapchain = false;
         }
 
+        let mut command_builder = self.make_command_builder();
+
+        let (texture, sampler) = self.make_texture(&mut command_builder, texture);
+
         let pipeline_layout = self.pipeline.layout().set_layouts().get(0).unwrap();
         let descriptor_set = PersistentDescriptorSet::new(
             &self.alloc_ds,
             pipeline_layout.clone(),
-            [WriteDescriptorSet::buffer(0, data.uniforms.clone())],
+            [
+                WriteDescriptorSet::buffer(0, data.uniforms.clone()),
+                WriteDescriptorSet::image_view_sampler(1, texture, sampler),
+            ],
         )
         .unwrap();
 
@@ -422,14 +469,14 @@ impl Renderer {
         }
 
         let command_buffer = self.build_command_buffer(
+            command_builder,
             image_num as usize,
-            self.alloc_command.clone(),
             descriptor_set,
-            data.vertices.clone(),
-            data.indices.clone(),
+            &data,
         );
 
-        let future = self.previous_frame_end
+        let future = self
+            .previous_frame_end
             .take()
             .unwrap()
             .join(acquire_future)
@@ -438,10 +485,7 @@ impl Renderer {
             // Submit a present command at the end of the queue.
             .then_swapchain_present(
                 self.queues[0].clone(),
-                SwapchainPresentInfo::swapchain_image_index(
-                    self.swapchain.clone(),
-                    image_num,
-                ),
+                SwapchainPresentInfo::swapchain_image_index(self.swapchain.clone(), image_num),
             )
             .then_signal_fence_and_flush();
 

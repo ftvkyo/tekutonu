@@ -6,9 +6,9 @@ use vulkano::{
         graphics::{
             depth_stencil::DepthStencilState,
             input_assembly::InputAssemblyState,
-            rasterization::{CullMode, FrontFace, RasterizationState},
+            rasterization::{CullMode, RasterizationState},
             vertex_input::BuffersDefinition,
-            viewport::ViewportState,
+            viewport::ViewportState, color_blend::ColorBlendState,
         },
         GraphicsPipeline,
         StateMode,
@@ -25,13 +25,14 @@ pub fn make_pipeline(
     vs: Arc<ShaderModule>,
     fs: Arc<ShaderModule>,
 ) -> Arc<GraphicsPipeline> {
+    let subpass = Subpass::from(render_pass.clone(), 0).unwrap();
+
     GraphicsPipeline::start()
         // How the vertices are laid out.
         .vertex_input_state(BuffersDefinition::new().vertex::<Vertex>())
         .vertex_shader(vs.entry_point("main").unwrap(), ())
         .rasterization_state(RasterizationState {
             // polygon_mode: todo!(),
-            front_face: StateMode::Fixed(FrontFace::Clockwise),
             cull_mode: StateMode::Fixed(CullMode::Back),
             ..Default::default()
         })
@@ -41,6 +42,7 @@ pub fn make_pipeline(
         .viewport_state(ViewportState::viewport_dynamic_scissor_irrelevant())
         .fragment_shader(fs.entry_point("main").unwrap(), ())
         .depth_stencil_state(DepthStencilState::simple_depth_test())
+        .color_blend_state(ColorBlendState::new(subpass.num_color_attachments()).blend_alpha())
         // Which subpass of which render pass this pipeline is going to be used in.
         .render_pass(Subpass::from(render_pass, 0).unwrap())
         .build(device)
