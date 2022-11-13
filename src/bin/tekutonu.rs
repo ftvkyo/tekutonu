@@ -1,7 +1,7 @@
 use tekutonu::{
     controller::GameInput,
     model::GameModel,
-    view::{instance::make_instance, GameView},
+    view::{renderer::{instance::make_instance, Renderer}, GameView},
 };
 use tracing_subscriber::fmt::format::FmtSpan;
 use winit::event_loop::EventLoop;
@@ -21,9 +21,10 @@ fn main() {
         .init();
 
     let vk = make_instance();
-
     let event_loop = EventLoop::new();
-    let view = GameView::new(vk, event_loop);
+
+    let renderer = Renderer::new(vk, &event_loop);
+    let view = GameView::new(renderer, event_loop);
 
     let game = GameModel::default();
     let input = GameInput::new();
