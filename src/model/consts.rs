@@ -1,3 +1,5 @@
+use cgmath::Point3;
+
 const CHUNK_EDGE_BLOCKS: usize = 16;
 
 pub const CHUNK_X_BLOCKS: usize = CHUNK_EDGE_BLOCKS;
@@ -15,23 +17,23 @@ pub const REGION_Z_CHUNKS: usize = REGION_SIDE_CHUNKS;
 
 pub const REGION_TOTAL_CHUNKS: usize = REGION_X_CHUNKS * REGION_Y_CHUNKS * REGION_Z_CHUNKS;
 
-pub const BLOCK_FACES: [[super::types::PointIntGlobal; 4]; 6] = {
+pub const BLOCK_FACES: [[Point3<f32>; 4]; 6] = {
     // l, r - left, right
     // b, t - bottom, top
     // n, f - near, far
 
-    let [l, b, n] = [0, 0, 0];
-    let [r, t, f] = [1, 1, 1];
+    let [l, b, n] = [0.0, 0.0, 0.0];
+    let [r, t, f] = [1.0, 1.0, 1.0];
 
     // Binary counting
-    let lbn = [l, b, n];
-    let lbf = [l, b, f];
-    let ltn = [l, t, n];
-    let ltf = [l, t, f];
-    let rbn = [r, b, n];
-    let rbf = [r, b, f];
-    let rtn = [r, t, n];
-    let rtf = [r, t, f];
+    let lbn = Point3::new(l, b, n);
+    let lbf = Point3::new(l, b, f);
+    let ltn = Point3::new(l, t, n);
+    let ltf = Point3::new(l, t, f);
+    let rbn = Point3::new(r, b, n);
+    let rbf = Point3::new(r, b, f);
+    let rtn = Point3::new(r, t, n);
+    let rtf = Point3::new(r, t, f);
 
     // Encode block faces:
     // front, left, back, right, bottom, top

@@ -3,7 +3,8 @@ use tekutonu::{
     model::GameModel,
     view::{
         renderer::{instance::make_instance, Renderer},
-        GameView, texture::TextureLoader,
+        texture::TextureLoader,
+        GameView,
     },
 };
 use tracing_subscriber::fmt::format::FmtSpan;

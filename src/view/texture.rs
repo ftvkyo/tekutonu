@@ -1,4 +1,4 @@
-use std::{path::{PathBuf}, fs::File};
+use std::{fs::File, path::PathBuf};
 
 use png::OutputInfo;
 use tracing::instrument;
@@ -15,9 +15,7 @@ pub struct TextureLoader {
 impl TextureLoader {
     #[instrument]
     pub fn new(path: PathBuf) -> Self {
-        Self {
-            path,
-        }
+        Self { path }
     }
 
     #[instrument(skip(self))]
@@ -30,9 +28,6 @@ impl TextureLoader {
         // Read the next frame. An APNG might contain multiple frames.
         let info = reader.next_frame(&mut bytes).unwrap();
 
-        Texture {
-            info,
-            bytes
-        }
+        Texture { info, bytes }
     }
 }

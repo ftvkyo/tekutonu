@@ -96,7 +96,7 @@ pub struct GameModel {
 impl Default for GameModel {
     #[instrument]
     fn default() -> Self {
-        let mut world = Region::new();
+        let mut world = Region::default();
 
         let s = Block {
             kind: BlockKind::Stone,

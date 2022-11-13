@@ -1,3 +1,5 @@
+use cgmath::{InnerSpace, Point3, Vector3};
+
 use super::{
     block::{Block, BlockKind},
     consts as c,
@@ -10,7 +12,7 @@ pub struct Chunk {
 }
 
 impl Chunk {
-    pub fn get_block<'s>(&'s self, loc: t::PointIntLocal) -> &'s Block {
+    pub fn get_block(&self, loc: t::PointIntLocal) -> &Block {
         &self.blocks[loc[0]][loc[1]][loc[2]]
     }
 
@@ -22,24 +24,19 @@ impl Chunk {
         self.blocks[loc[0]][loc[1]][loc[2]] = block;
     }
 
-    fn assemble_faces(&self) -> Vec<[t::PointIntGlobal; 4]> {
-        let mut faces = Vec::<[t::PointIntGlobal; 4]>::new();
+    fn assemble_faces(&self) -> Vec<[Point3<f32>; 4]> {
+        let mut faces = Vec::<[Point3<f32>; 4]>::new();
 
         for x in 0..c::CHUNK_X_BLOCKS {
+            let fx = x as f32;
             for y in 0..c::CHUNK_Y_BLOCKS {
+                let fy = y as f32;
                 for z in 0..c::CHUNK_Z_BLOCKS {
+                    let fz = z as f32;
+                    let offset = Vector3::new(fx, fy, fz);
                     let block = self.get_block([x, y, z]);
                     if block.kind == BlockKind::Stone {
-                        for face in c::BLOCK_FACES {
-                            let face = face.map(|v| {
-                                [
-                                    v[0] + x as i64,
-                                    v[1] + y as i64,
-                                    v[2] + z as i64,
-                                ]
-                            });
-                            faces.push(face);
-                        }
+                        faces.extend(c::BLOCK_FACES.iter().map(|f| f.map(|p| p + offset)));
                     }
                 }
             }
@@ -48,40 +45,36 @@ impl Chunk {
         faces
     }
 
-    pub fn get_render_data(&self, global_offset: [f32; 3]) -> (Vec<[f32; 3]>, Vec<usize>) {
+    pub fn get_render_data(
+        &self,
+        global_offset: Vector3<f32>,
+    ) -> (Vec<Point3<f32>>, Vec<Vector3<f32>>, Vec<usize>) {
         let faces = self.assemble_faces();
 
-        let to_f32 = |[x, y, z]: [i64; 3]| {
-            [
-                x as f32,
-                y as f32,
-                z as f32,
-            ]
-        };
-        let add_offset = |c: [f32; 3]| {
-            [
-                c[0] + global_offset[0],
-                c[1] + global_offset[1],
-                c[2] + global_offset[2],
-            ]
-        };
+        let add_offset = |p: Point3<f32>| p + global_offset;
 
-        let mut vertices = vec![];
-        let mut indices = vec![];
+        // Vertices
+        let mut vs = vec![];
+        // Normals
+        let mut ns = vec![];
+        // Indices
+        let mut is = vec![];
 
         for face in faces {
-            let i = vertices.len();
-            // Four faces
-            vertices.extend(
-                face.into_iter()
-                    .map(to_f32)
-                    .map(add_offset)
-            );
+            let i = vs.len();
+            // Four vertices
+            vs.extend(face.into_iter().map(add_offset));
+            ns.extend([
+                (face[3] - face[0]).cross(face[1] - face[0]).normalize(), // For vertex 0
+                (face[0] - face[1]).cross(face[2] - face[1]).normalize(), // For vertex 1
+                (face[1] - face[2]).cross(face[3] - face[2]).normalize(), // For vertex 2
+                (face[2] - face[3]).cross(face[0] - face[3]).normalize(), // For vertex 3
+            ]);
             // Two triangles
-            indices.extend([i, i+1, i+2, i, i+2, i+3]);
+            is.extend([i, i + 1, i + 2, i, i + 2, i + 3]);
         }
 
-        (vertices, indices)
+        (vs, ns, is)
     }
 }
 

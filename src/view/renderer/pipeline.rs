@@ -4,11 +4,12 @@ use vulkano::{
     device::Device,
     pipeline::{
         graphics::{
+            color_blend::ColorBlendState,
             depth_stencil::DepthStencilState,
             input_assembly::InputAssemblyState,
             rasterization::{CullMode, RasterizationState},
             vertex_input::BuffersDefinition,
-            viewport::ViewportState, color_blend::ColorBlendState,
+            viewport::ViewportState,
         },
         GraphicsPipeline,
         StateMode,
@@ -17,7 +18,7 @@ use vulkano::{
     shader::ShaderModule,
 };
 
-use super::data::Vertex;
+use super::data::{Normal, Vertex};
 
 pub fn make_pipeline(
     device: Arc<Device>,
@@ -29,7 +30,11 @@ pub fn make_pipeline(
 
     GraphicsPipeline::start()
         // How the vertices are laid out.
-        .vertex_input_state(BuffersDefinition::new().vertex::<Vertex>())
+        .vertex_input_state(
+            BuffersDefinition::new()
+                .vertex::<Vertex>()
+                .vertex::<Normal>(),
+        )
         .vertex_shader(vs.entry_point("main").unwrap(), ())
         .rasterization_state(RasterizationState {
             // polygon_mode: todo!(),
