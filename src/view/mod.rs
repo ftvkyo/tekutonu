@@ -1,32 +1,45 @@
-pub mod renderer;
-
-use std::{time::Instant};
-
-use winit::{event_loop::{EventLoop, ControlFlow}, event::{WindowEvent, Event, KeyboardInput, DeviceEvent}};
-
-use crate::{model::GameModel, controller::GameInput};
+use std::time::Instant;
 
 use renderer::Renderer;
+use winit::{
+    event::{DeviceEvent, Event, KeyboardInput, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+};
+
+use crate::{controller::GameInput, model::GameModel};
+
+use self::texture::TextureLoader;
+
+pub mod renderer;
+pub mod texture;
 
 pub struct GameView {
     renderer: Renderer,
+    loader_tex: TextureLoader,
 
     event_loop: EventLoop<()>,
 }
 
 impl GameView {
-    pub fn new(renderer: Renderer, event_loop: EventLoop<()>) -> Self {
+    pub fn new(renderer: Renderer, loader_tex: TextureLoader, event_loop: EventLoop<()>) -> Self {
         Self {
             renderer,
+            loader_tex,
             event_loop,
         }
     }
 
     pub fn run(self, mut game: GameModel, mut input: GameInput) {
-        let Self { mut renderer, event_loop } = self;
+        let Self {
+            mut renderer,
+            loader_tex,
+            event_loop,
+        } = self;
 
         renderer.set_cursor_hidden(true);
         renderer.set_cursor_locked(true).unwrap();
+
+        let texture = loader_tex.load("tex.png");
 
         let mut last_tick = Instant::now();
 
@@ -66,11 +79,10 @@ impl GameView {
                 },
                 Event::RedrawEventsCleared => {
                     let data = renderer.make_draw_data(&game);
-                    renderer.draw(&data);
+                    renderer.draw(&data, &texture);
                 },
                 _ => (),
             }
         });
-
     }
 }

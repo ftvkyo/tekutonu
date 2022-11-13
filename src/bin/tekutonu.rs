@@ -1,7 +1,10 @@
 use tekutonu::{
     controller::GameInput,
     model::GameModel,
-    view::{renderer::{instance::make_instance, Renderer}, GameView},
+    view::{
+        renderer::{instance::make_instance, Renderer},
+        GameView, texture::TextureLoader,
+    },
 };
 use tracing_subscriber::fmt::format::FmtSpan;
 use winit::event_loop::EventLoop;
@@ -20,11 +23,13 @@ fn main() {
         .with_timer(tracing_subscriber::fmt::time::uptime())
         .init();
 
+    let loader_tex = TextureLoader::new("res/".into());
+
     let vk = make_instance();
     let event_loop = EventLoop::new();
 
     let renderer = Renderer::new(vk, &event_loop);
-    let view = GameView::new(renderer, event_loop);
+    let view = GameView::new(renderer, loader_tex, event_loop);
 
     let game = GameModel::default();
     let input = GameInput::new();
