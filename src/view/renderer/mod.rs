@@ -181,10 +181,10 @@ impl Renderer {
     }
 }
 
-type ACBB = AutoCommandBufferBuilder<PrimaryAutoCommandBuffer, Arc<StandardCommandBufferAllocator>>;
+type Acbb = AutoCommandBufferBuilder<PrimaryAutoCommandBuffer, Arc<StandardCommandBufferAllocator>>;
 
 impl Renderer {
-    fn make_command_builder(&self) -> ACBB {
+    fn make_command_builder(&self) -> Acbb {
         AutoCommandBufferBuilder::primary(
             &self.alloc_command.clone(),
             // Can only use the command buffer with this queue
@@ -196,7 +196,7 @@ impl Renderer {
 
     fn make_texture(
         &self,
-        builder: &mut ACBB,
+        builder: &mut Acbb,
         texture: &Texture,
     ) -> (Arc<ImageView<ImmutableImage>>, Arc<Sampler>) {
         let dimensions = ImageDimensions::Dim2d {
@@ -232,7 +232,7 @@ impl Renderer {
 
     fn build_command_buffer(
         &mut self,
-        mut builder: ACBB,
+        mut builder: Acbb,
         image_num: usize,
         ds: Arc<PersistentDescriptorSet>,
         data: &DrawData,
@@ -332,15 +332,19 @@ impl Renderer {
 
         self.pool_uniform.from_data(uniform_data).unwrap()
     }
+}
 
+type Vni = (
+    Arc<CpuAccessibleBuffer<[Vertex]>>,
+    Arc<CpuAccessibleBuffer<[Normal]>>,
+    Arc<CpuAccessibleBuffer<[u16]>>,
+);
+
+impl Renderer {
     fn make_vni(
         &self,
         game: &GameModel,
-    ) -> (
-        Arc<CpuAccessibleBuffer<[Vertex]>>,
-        Arc<CpuAccessibleBuffer<[Normal]>>,
-        Arc<CpuAccessibleBuffer<[u16]>>,
-    ) {
+    ) -> Vni {
         let (v, n, i) = game
             .world
             .get_chunk([0, 0, 0])

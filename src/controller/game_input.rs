@@ -9,15 +9,14 @@ use winit::{
 use crate::model::effect::GameModelEffect;
 
 
+#[derive(Default)]
 pub struct GameInput {
     keys_held: HashSet<VirtualKeyCode>,
 }
 
 impl GameInput {
     pub fn new() -> Self {
-        Self {
-            keys_held: HashSet::new(),
-        }
+        Default::default()
     }
 
     pub fn mouse_movement(&self, delta: (f64, f64)) -> GameModelEffect {
@@ -88,7 +87,7 @@ impl GameInput {
             match Self::keyboard_held(key) {
                 Some(GameModelEffect::ShiftCamera { direction }) => {
                     camera_shift_acc =
-                        Some(camera_shift_acc.unwrap_or(Vector3::zero()) + direction);
+                        Some(camera_shift_acc.unwrap_or_else(Vector3::zero) + direction);
                 },
                 _ => (),
             }
