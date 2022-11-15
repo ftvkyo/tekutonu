@@ -42,6 +42,6 @@ mod tests {
         let chunk = reg.get_chunk([1, 2, 3]);
         let block = chunk.get_block([1, 2, 3]);
 
-        assert_eq!(block.kind, BlockKind::Air);
+        assert_eq!(block.kind, BlockKind::air());
     }
 }

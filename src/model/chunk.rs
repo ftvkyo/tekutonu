@@ -35,7 +35,7 @@ impl Chunk {
                     let fz = z as f32;
                     let offset = Vector3::new(fx, fy, fz);
                     let block = self.get_block([x, y, z]);
-                    if block.kind == BlockKind::Stone {
+                    if block.kind == BlockKind::Solid {
                         faces.extend(c::BLOCK_FACES.iter().map(|f| f.map(|p| p + offset)));
                     }
                 }
@@ -97,7 +97,7 @@ mod tests {
         #[test]
         fn one() {
             let mut chunk = Chunk::default();
-            chunk.get_block_mut([0, 0, 0]).kind = BlockKind::Stone;
+            chunk.get_block_mut([0, 0, 0]).kind = BlockKind::Solid;
 
             let ts = chunk.assemble_faces();
 
@@ -107,8 +107,8 @@ mod tests {
         #[test]
         fn two() {
             let mut chunk = Chunk::default();
-            chunk.get_block_mut([0, 0, 0]).kind = BlockKind::Stone;
-            chunk.get_block_mut([0, 0, 1]).kind = BlockKind::Stone;
+            chunk.get_block_mut([0, 0, 0]).kind = BlockKind::Solid;
+            chunk.get_block_mut([0, 0, 1]).kind = BlockKind::Solid;
 
             let ts = chunk.assemble_faces();
 

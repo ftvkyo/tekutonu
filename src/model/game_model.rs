@@ -100,7 +100,7 @@ impl Default for GameModel {
         let mut world = Region::default();
 
         let s = Block {
-            kind: BlockKind::Stone,
+            kind: BlockKind::Solid,
         };
 
         let c = world.get_chunk_mut([0, 0, 0]);
