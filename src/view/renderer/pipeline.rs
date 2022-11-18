@@ -18,7 +18,7 @@ use vulkano::{
     shader::ShaderModule,
 };
 
-use super::data::{Normal, Vertex};
+use super::data::{Light, Vertex};
 
 pub fn make_pipeline(
     device: Arc<Device>,
@@ -33,7 +33,7 @@ pub fn make_pipeline(
         .vertex_input_state(
             BuffersDefinition::new()
                 .vertex::<Vertex>()
-                .vertex::<Normal>(),
+                .vertex::<Light>(),
         )
         .vertex_shader(vs.entry_point("main").unwrap(), ())
         .rasterization_state(RasterizationState {

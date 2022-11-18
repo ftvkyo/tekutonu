@@ -7,7 +7,7 @@ use super::{
     block::{Block, BlockKind},
     consts,
     effect::GameModelEffect,
-    region::Region,
+    region::Region, chunk::Chunk,
 };
 use crate::util::normalize_angle;
 
@@ -99,34 +99,41 @@ impl Default for GameModel {
     fn default() -> Self {
         let mut world = Region::default();
 
-        let s = Block {
-            kind: BlockKind::Solid,
-        };
+        let s = Block::solid();
+        let mut c = Chunk::default();
 
-        let c = world.get_chunk_mut([0, 0, 0]);
-
-        c.set_block([0, 0, 0], s);
+        // Zero
+        c.set_block([0isize, 0, 0], s);
 
         // Orientation
-        c.set_block([3, 3, 3], s);
-        c.set_block([3, 3, 4], s);
-        c.set_block([3, 4, 3], s);
-        c.set_block([4, 3, 3], s);
+        c.set_block([3isize, 3, 3], s);
+        c.set_block([3isize, 3, 4], s);
+        c.set_block([3isize, 4, 3], s);
+        c.set_block([4isize, 3, 3], s);
 
         // Smileyface
-        c.set_block([1, 2, 8], s);
-        c.set_block([2, 1, 8], s);
-        c.set_block([3, 1, 8], s);
-        c.set_block([4, 1, 8], s);
-        c.set_block([5, 2, 8], s);
-        c.set_block([2, 4, 8], s);
-        c.set_block([4, 4, 8], s);
+        c.set_block([1isize, 2, 8], s);
+        c.set_block([2isize, 1, 8], s);
+        c.set_block([3isize, 1, 8], s);
+        c.set_block([4isize, 1, 8], s);
+        c.set_block([5isize, 2, 8], s);
+        c.set_block([2isize, 4, 8], s);
+        c.set_block([4isize, 4, 8], s);
 
+        c.set_block([5isize, 5, 5], Block::light_source());
+
+        c.set_block([14isize, 14, 14], Block::light_source());
+
+
+        // Wall
         for y in 0..consts::CHUNK_Y_BLOCKS {
             for z in 0..consts::CHUNK_Z_BLOCKS {
                 c.set_block([consts::CHUNK_X_BLOCKS - 1, y, z], s);
             }
         }
+
+        world.set_chunk([1, 1, 1], c);
+        world.recalculate_chunk_light([1, 1, 1]);
 
         Self {
             camera: Default::default(),

@@ -50,7 +50,7 @@ use winit::{
     window::{CursorGrabMode, Window},
 };
 
-use self::data::Normal;
+use self::data::Light;
 use super::texture::Texture;
 use crate::model::GameModel;
 
@@ -259,7 +259,7 @@ impl Renderer {
                 0,
                 ds,
             )
-            .bind_vertex_buffers(0, (data.vertices.clone(), data.normals.clone()))
+            .bind_vertex_buffers(0, (data.vertices.clone(), data.lights.clone()))
             .bind_index_buffer(data.indices.clone())
             .draw_indexed(data.indices.len() as u32, 1, 0, 0, 0)
             .unwrap()
@@ -336,15 +336,15 @@ impl Renderer {
 
 type Vni = (
     Arc<CpuAccessibleBuffer<[Vertex]>>,
-    Arc<CpuAccessibleBuffer<[Normal]>>,
+    Arc<CpuAccessibleBuffer<[Light]>>,
     Arc<CpuAccessibleBuffer<[u16]>>,
 );
 
 impl Renderer {
-    fn make_vni(&self, game: &GameModel) -> Vni {
-        let (v, n, i) = game
+    fn make_vli(&self, game: &GameModel) -> Vni {
+        let (v, l, i) = game
             .world
-            .get_chunk([0, 0, 0])
+            .get_chunk([1, 1, 1])
             .get_render_data(Vector3::new(0.0, 0.0, 0.0));
 
         let v = CpuAccessibleBuffer::from_iter(
@@ -358,14 +358,14 @@ impl Renderer {
         )
         .unwrap();
 
-        let n = CpuAccessibleBuffer::from_iter(
+        let l = CpuAccessibleBuffer::from_iter(
             &self.alloc_memory,
             BufferUsage {
                 vertex_buffer: true,
                 ..BufferUsage::empty()
             },
             false,
-            n.into_iter().map(Normal::from),
+            l.into_iter().map(Light::from),
         )
         .unwrap();
 
@@ -380,7 +380,7 @@ impl Renderer {
         )
         .unwrap();
 
-        (v, n, i)
+        (v, l, i)
     }
 
     #[instrument(skip_all)]
@@ -409,11 +409,11 @@ impl Renderer {
     }
 
     pub fn make_draw_data(&self, game: &GameModel) -> DrawData {
-        let (vertices, normals, indices) = self.make_vni(game);
+        let (vertices, lights, indices) = self.make_vli(game);
         let uniforms = self.make_uniforms(game);
         DrawData {
             vertices,
-            normals,
+            lights,
             indices,
             uniforms,
         }
@@ -422,7 +422,7 @@ impl Renderer {
 
 pub struct DrawData {
     vertices: Arc<CpuAccessibleBuffer<[Vertex]>>,
-    normals: Arc<CpuAccessibleBuffer<[Normal]>>,
+    lights: Arc<CpuAccessibleBuffer<[Light]>>,
     indices: Arc<CpuAccessibleBuffer<[u16]>>,
     uniforms: Arc<CpuBufferPoolSubbuffer<shaders::vs::ty::Data>>,
 }

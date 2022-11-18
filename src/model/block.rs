@@ -2,10 +2,7 @@ pub type LightLevel = u8;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum BlockKind {
-    Air {
-        light_local: LightLevel,
-        light_global: LightLevel,
-    },
+    Air,
     Solid,
     Light {
         brightness: LightLevel,
@@ -13,22 +10,6 @@ pub enum BlockKind {
 }
 
 impl BlockKind {
-    pub fn air() -> Self {
-        Self::Air {
-            light_local: 0,
-            light_global: 0,
-        }
-    }
-
-    pub fn solid() -> Self {
-        Self::Solid
-    }
-
-    pub fn light() -> Self {
-        Self::Light {
-            brightness: 15,
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -36,10 +17,30 @@ pub struct Block {
     pub kind: BlockKind,
 }
 
+impl Block {
+    pub fn air() -> Self {
+        Self {
+            kind: BlockKind::Air
+        }
+    }
+
+    pub fn solid() -> Self {
+        Self {
+            kind: BlockKind::Solid
+        }
+    }
+
+    pub fn light_source() -> Self {
+        Self {
+            kind: BlockKind::Light {
+                brightness: 15
+            }
+        }
+    }
+}
+
 impl Default for Block {
     fn default() -> Self {
-        Self {
-            kind: BlockKind::air(),
-        }
+        Self::air()
     }
 }

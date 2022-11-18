@@ -4,13 +4,11 @@ pub mod vs {
         src: "
             #version 450
 
-            layout(location = 0) in vec3 position;
-            layout(location = 1) in vec3 normal;
+            layout(location = 0) in vec3 v_position;
+            layout(location = 1) in float v_light;
 
-            layout(location = 0) out vec2 tex_coords;
-            layout(location = 1) out vec3 f_position;
-            layout(location = 2) out vec3 f_normal;
-            layout(location = 3) out vec3 light_position;
+            layout(location = 0) out vec2 f_tex_coords;
+            layout(location = 1) out float f_light;
 
             layout(set = 0, binding = 0) uniform Data {
                 mat4 world;
@@ -25,21 +23,14 @@ pub mod vs {
                 vec2(0, 1)
             );
 
-            const vec4 lightPos = vec4(5);
-
             void main() {
-                // Texture coordinates
-                tex_coords = tex_corners[gl_VertexIndex % 4];
-
                 // View transformations
-                vec4 position = vec4(position, 1);
+                vec4 position = vec4(v_position, 1);
                 mat4 worldview = uniforms.view * uniforms.world;
 
-                light_position = (uniforms.world * lightPos).xyz;
-
                 // Fragment properties
-                f_position = (uniforms.world * position).xyz;
-                f_normal = transpose(inverse(mat3(uniforms.world))) * normal;
+                f_tex_coords = tex_corners[gl_VertexIndex % 4];
+                f_light = v_light;
 
                 gl_Position = uniforms.proj * worldview * position;
             }
@@ -58,10 +49,8 @@ pub mod fs {
         src: "
             #version 450
 
-            layout(location = 0) in vec2 tex_coords;
-            layout(location = 1) in vec3 f_position;
-            layout(location = 2) in vec3 f_normal;
-            layout(location = 3) in vec3 light_position;
+            layout(location = 0) in vec2 f_tex_coords;
+            layout(location = 1) in float f_light;
 
             layout(location = 0) out vec4 f_color;
 
@@ -74,13 +63,10 @@ pub mod fs {
 
             void main() {
                 vec3 ambient = ambient_color * ambient_strength;
+                vec3 local = light_color * f_light;
 
-                vec3 light_direction = normalize(light_position - f_position);
-                float diff = max(0, dot(normalize(f_normal), light_direction));
-                vec3 diffuse = vec3(diff * light_color);
-
-                vec4 texture_color = texture(tex, tex_coords);
-                vec4 texture = vec4(ambient + diffuse, 1) * texture_color;
+                vec4 texture_color = texture(tex, f_tex_coords);
+                vec4 texture = vec4(ambient + local, 1) * texture_color;
 
                 f_color = texture;
             }

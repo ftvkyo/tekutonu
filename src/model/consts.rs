@@ -1,5 +1,7 @@
 use cgmath::Point3;
 
+use super::types::PointIntLocal;
+
 const CHUNK_EDGE_BLOCKS: usize = 16;
 
 pub const CHUNK_X_BLOCKS: usize = CHUNK_EDGE_BLOCKS;
@@ -46,3 +48,13 @@ pub const BLOCK_FACES: [[Point3<f32>; 4]; 6] = {
         [ltn, rtn, rtf, ltf],
     ]
 };
+
+// These are ordered the same way as `BLOCK_FACES`
+pub const ADJACENCY: [PointIntLocal; 6] = [
+    PointIntLocal::new(0, 0, -1), // Z negative, front
+    PointIntLocal::new(-1, 0, 0), // X negative, left
+    PointIntLocal::new(0, 0, 1),  // Z positive, back
+    PointIntLocal::new(1, 0, 0),  // X positive, right
+    PointIntLocal::new(0, -1, 0), // Y negative, bottom
+    PointIntLocal::new(0, 1, 0),  // Y positive, top
+];
