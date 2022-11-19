@@ -4,11 +4,11 @@ pub mod vs {
         src: "
             #version 450
 
-            layout(location = 0) in vec3 position;
-            layout(location = 1) in vec3 normal;
+            layout(location = 0) in vec3 v_position;
+            layout(location = 1) in float v_light;
 
-            layout(location = 0) out vec2 tex_coords;
-            layout(location = 1) out vec3 v_normal;
+            layout(location = 0) out vec2 f_tex_coords;
+            layout(location = 1) out float f_light;
 
             layout(set = 0, binding = 0) uniform Data {
                 mat4 world;
@@ -24,10 +24,15 @@ pub mod vs {
             );
 
             void main() {
-                tex_coords = tex_corners[gl_VertexIndex % 4];
+                // View transformations
+                vec4 position = vec4(v_position, 1);
                 mat4 worldview = uniforms.view * uniforms.world;
-                v_normal = transpose(inverse(mat3(worldview))) * normal;
-                gl_Position = uniforms.proj * worldview * vec4(position, 1);
+
+                // Fragment properties
+                f_tex_coords = tex_corners[gl_VertexIndex % 4];
+                f_light = v_light;
+
+                gl_Position = uniforms.proj * worldview * position;
             }
         ",
         types_meta: {
@@ -44,21 +49,26 @@ pub mod fs {
         src: "
             #version 450
 
-            layout(location = 0) in vec2 tex_coords;
-            layout(location = 1) in vec3 v_normal;
+            layout(location = 0) in vec2 f_tex_coords;
+            layout(location = 1) in float f_light;
 
             layout(location = 0) out vec4 f_color;
 
             layout(set = 0, binding = 1) uniform sampler2D tex;
 
-            const vec3 LIGHT = vec3(0.0, 0.0, 1.0);
+            const vec3 light_color = vec3(1.0, 1.0, 1.0);
+
+            const vec3 ambient_color = vec3(1.0, 1.0, 1.0);
+            const float ambient_strength = 0.2;
 
             void main() {
-                float brightness = dot(normalize(v_normal), normalize(LIGHT));
-                vec4 dark_color = vec4(0.1, 0.1, 0.1, 1.0);
-                vec4 regular_color = texture(tex, tex_coords);
+                vec3 ambient = ambient_color * ambient_strength;
+                vec3 local = light_color * f_light;
 
-                f_color = mix(dark_color, regular_color, brightness);
+                vec4 texture_color = texture(tex, f_tex_coords);
+                vec4 texture = vec4(ambient + local, 1) * texture_color;
+
+                f_color = texture;
             }
         "
     }
