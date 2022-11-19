@@ -320,7 +320,7 @@ impl Renderer {
         );
 
         let view =
-            Matrix4::look_at_rh(position, position + direction, Vector3::new(0.0, -1.0, 0.0));
+            Matrix4::look_to_rh(position, direction, Vector3::new(0.0, -1.0, 0.0));
 
         let scale = Matrix4::from_scale(0.5);
 

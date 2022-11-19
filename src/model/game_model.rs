@@ -1,10 +1,8 @@
-use std::f64::consts::FRAC_PI_2;
-
 use cgmath::{InnerSpace, Matrix4, Point3, Rad, Vector3};
 use tracing::instrument;
 
 use super::{block::Block, chunk::Chunk, consts, effect::GameModelEffect, region::Region};
-use crate::util::normalize_angle;
+use crate::util::{normalize_angle, limit_yaw};
 
 pub struct Camera {
     /// Y is up, opposite to vulkan
@@ -151,8 +149,10 @@ impl GameModel {
             Debug => {
                 println!("Camera: {:#?}", self.camera);
             },
-            TeleportCamera { point } => {
+            TeleportCamera { point, pitch, yaw } => {
                 self.camera.position = point;
+                self.camera.pitch = limit_yaw(pitch);
+                self.camera.yaw = normalize_angle(yaw);
             },
             AdjustCameraAngles {
                 // Increasing the pitch should make us look more up
@@ -160,9 +160,7 @@ impl GameModel {
                 // Increasing the yaw should make us look more to the right
                 delta_yaw,
             } => {
-                self.camera.pitch = Rad((self.camera.pitch + delta_pitch)
-                    .0
-                    .clamp(-FRAC_PI_2, FRAC_PI_2));
+                self.camera.pitch = limit_yaw(self.camera.pitch + delta_pitch);
                 self.camera.yaw = normalize_angle(self.camera.yaw + delta_yaw);
             },
             ShiftCamera { direction } => {

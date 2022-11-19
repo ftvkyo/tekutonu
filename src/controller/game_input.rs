@@ -1,6 +1,6 @@
 use std::{collections::HashSet, f64::consts::FRAC_PI_2};
 
-use cgmath::{Rad, Vector3, Zero};
+use cgmath::{Rad, Vector3, Zero, Point3};
 use winit::{
     event::{ElementState, VirtualKeyCode},
     event_loop::ControlFlow,
@@ -42,11 +42,11 @@ impl GameInput {
                 None
             },
             (Tab, Released) => Some(GameModelEffect::Debug),
-            (W | A | S | D | R | F, Pressed) => {
+            (W | A | S | D | R | F | O, Pressed) => {
                 self.keys_held.insert(key);
                 None
             },
-            (W | A | S | D | R | F, Released) => {
+            (W | A | S | D | R | F | O, Released) => {
                 self.keys_held.remove(&key);
                 None
             },
@@ -76,6 +76,11 @@ impl GameInput {
             F => Some(GameModelEffect::ShiftCamera {
                 direction: Vector3::new(0.0, -0.05, 0.0),
             }),
+            O => Some(GameModelEffect::TeleportCamera {
+                point: Point3::new(0., 0.5, 0.),
+                pitch: Rad(0.),
+                yaw: Rad(0.),
+            }),
             _ => None,
         }
     }
@@ -84,12 +89,15 @@ impl GameInput {
         let mut camera_shift_acc = None;
 
         for key in self.keys_held.iter() {
-            match Self::keyboard_held(key) {
+            let effect = Self::keyboard_held(key);
+            match effect {
                 Some(GameModelEffect::ShiftCamera { direction }) => {
                     camera_shift_acc =
                         Some(camera_shift_acc.unwrap_or_else(Vector3::zero) + direction);
                 },
-                _ => (),
+                _ => {
+                    return effect;
+                },
             }
         }
 

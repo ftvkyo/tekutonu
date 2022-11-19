@@ -4,6 +4,8 @@ pub enum GameModelEffect {
     Debug,
     TeleportCamera {
         point: Point3<f64>,
+        pitch: Rad<f64>,
+        yaw: Rad<f64>,
     },
     /// Shift camera relatively to where it is looking.
     /// X is right, Y is down, Z is forward
