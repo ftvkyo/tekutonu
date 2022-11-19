@@ -327,16 +327,23 @@ impl Chunk {
                     let loc = t::PointIntLocal::from([x, y, z]);
                     let offset = Vector3::new(fx, fy, fz);
                     let block = self.get_block(loc);
-                    if block.kind == BlockKind::Solid {
-                        faces.extend(c::BLOCK_FACES.iter().enumerate().map(|(i, face)| {
+                    if !block.is_transparent() {
+                        faces.extend(c::BLOCK_FACES.iter().enumerate().filter_map(|(i, face)| {
                             let loc2 = loc + &c::ADJACENCY[i];
+
+                            // TODO: make it work on chunk borders
                             let light = if loc2.is_in_chunk() {
+                                let adjacent_block = self.get_block(loc2);
+                                if !adjacent_block.is_transparent() {
+                                    return None;
+                                }
+
                                 self.get_light(loc2)
                             } else {
                                 1
                             };
 
-                            (face.map(|p| p + offset), light)
+                            Some((face.map(|p| p + offset), light))
                         }));
                     }
                 }
