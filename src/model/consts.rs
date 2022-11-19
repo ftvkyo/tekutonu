@@ -58,3 +58,5 @@ pub const ADJACENCY: [PointIntLocal; 6] = [
     PointIntLocal::new(0, -1, 0), // Y negative, bottom
     PointIntLocal::new(0, 1, 0),  // Y positive, top
 ];
+
+pub const LIGHT_MAX: isize = 15;

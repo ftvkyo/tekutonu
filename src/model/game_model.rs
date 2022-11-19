@@ -3,12 +3,7 @@ use std::f64::consts::FRAC_PI_2;
 use cgmath::{InnerSpace, Matrix4, Point3, Rad, Vector3};
 use tracing::instrument;
 
-use super::{
-    block::{Block, BlockKind},
-    consts,
-    effect::GameModelEffect,
-    region::Region, chunk::Chunk,
-};
+use super::{block::Block, chunk::Chunk, consts, effect::GameModelEffect, region::Region};
 use crate::util::normalize_angle;
 
 pub struct Camera {
@@ -124,11 +119,17 @@ impl Default for GameModel {
 
         c.set_block([14isize, 14, 14], Block::light_source());
 
-
         // Wall
         for y in 0..consts::CHUNK_Y_BLOCKS {
             for z in 0..consts::CHUNK_Z_BLOCKS {
                 c.set_block([consts::CHUNK_X_BLOCKS - 1, y, z], s);
+            }
+        }
+
+        // Roof
+        for x in 0..consts::CHUNK_X_BLOCKS {
+            for z in 5..consts::CHUNK_Z_BLOCKS {
+                c.set_block([x, consts::CHUNK_Y_BLOCKS - 1, z], s);
             }
         }
 

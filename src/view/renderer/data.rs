@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use cgmath::{Point3};
+use cgmath::Point3;
 use vulkano::impl_vertex;
 
 

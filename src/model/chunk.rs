@@ -30,12 +30,8 @@ pub struct SurroundingChunks<'a> {
 }
 
 impl<'a> SurroundingChunks<'a> {
-    pub fn new(
-        chunks: [&'a Chunk; 6],
-    ) -> Self {
-        Self {
-            chunks,
-        }
+    pub fn new(chunks: [&'a Chunk; 6]) -> Self {
+        Self { chunks }
     }
 
     pub fn get(&self, axis: Axis, sign: Sign) -> &'a Chunk {
@@ -50,7 +46,8 @@ impl<'a> SurroundingChunks<'a> {
         self.chunks[index]
     }
 
-    /// Get local light level for a location on one of inner chunk's faces based on the surrounding local light data.
+    /// Get local light level for a location on one of inner chunk's faces based
+    /// on the surrounding local light data.
     ///
     /// If the location is adjacent to multiple surrounding chunks,
     /// the light level is the maximum of the surrounding light levels.
@@ -60,33 +57,52 @@ impl<'a> SurroundingChunks<'a> {
         let mut light = 0;
 
         if loc.x() == 0 {
-            light = light.max(self.get(Axis::X, Sign::Negative).light_local[c::CHUNK_X_BLOCKS - 1][loc.uy()][loc.uz()] as i8 - 1);
+            light = light.max(
+                self.get(Axis::X, Sign::Negative).light_local[c::CHUNK_X_BLOCKS - 1][loc.uy()]
+                    [loc.uz()] as i8
+                    - 1,
+            );
         }
 
         if loc.x() == c::CHUNK_X_BLOCKS as isize - 1 {
-            light = light.max(self.get(Axis::X, Sign::Positive).light_local[0][loc.uy()][loc.uz()] as i8 - 1);
+            light = light.max(
+                self.get(Axis::X, Sign::Positive).light_local[0][loc.uy()][loc.uz()] as i8 - 1,
+            );
         }
 
         if loc.y() == 0 {
-            light = light.max(self.get(Axis::Y, Sign::Negative).light_local[loc.ux()][c::CHUNK_Y_BLOCKS - 1][loc.uz()] as i8 - 1);
+            light = light.max(
+                self.get(Axis::Y, Sign::Negative).light_local[loc.ux()][c::CHUNK_Y_BLOCKS - 1]
+                    [loc.uz()] as i8
+                    - 1,
+            );
         }
 
         if loc.y() == c::CHUNK_Y_BLOCKS as isize - 1 {
-            light = light.max(self.get(Axis::Y, Sign::Positive).light_local[loc.ux()][0][loc.uz()] as i8 - 1);
+            light = light.max(
+                self.get(Axis::Y, Sign::Positive).light_local[loc.ux()][0][loc.uz()] as i8 - 1,
+            );
         }
 
         if loc.z() == 0 {
-            light = light.max(self.get(Axis::Z, Sign::Negative).light_local[loc.ux()][loc.uy()][c::CHUNK_Z_BLOCKS - 1] as i8 - 1);
+            light = light.max(
+                self.get(Axis::Z, Sign::Negative).light_local[loc.ux()][loc.uy()]
+                    [c::CHUNK_Z_BLOCKS - 1] as i8
+                    - 1,
+            );
         }
 
         if loc.z() == c::CHUNK_Z_BLOCKS as isize - 1 {
-            light = light.max(self.get(Axis::Z, Sign::Positive).light_local[loc.ux()][loc.uy()][0] as i8 - 1);
+            light = light.max(
+                self.get(Axis::Z, Sign::Positive).light_local[loc.ux()][loc.uy()][0] as i8 - 1,
+            );
         }
 
         light as u8
     }
 
-    /// Get sky light level for a location on one of the inner chunk's faces based on the surrounding sky light data.
+    /// Get sky light level for a location on one of the inner chunk's faces
+    /// based on the surrounding sky light data.
     ///
     /// If the location is adjacent to multiple surrounding chunks,
     /// the light level is the maximum of the surrounding light levels.
@@ -98,28 +114,44 @@ impl<'a> SurroundingChunks<'a> {
         let mut light = 0;
 
         if loc.x() == 0 {
-            light = light.max(self.get(Axis::X, Sign::Negative).light_local[c::CHUNK_X_BLOCKS - 1][loc.uy()][loc.uz()] as i8 - 1);
+            light = light.max(
+                self.get(Axis::X, Sign::Negative).light_sky[c::CHUNK_X_BLOCKS - 1][loc.uy()]
+                    [loc.uz()] as i8
+                    - 1,
+            );
         }
 
         if loc.x() == c::CHUNK_X_BLOCKS as isize - 1 {
-            light = light.max(self.get(Axis::X, Sign::Positive).light_local[0][loc.uy()][loc.uz()] as i8 - 1);
+            light = light
+                .max(self.get(Axis::X, Sign::Positive).light_sky[0][loc.uy()][loc.uz()] as i8 - 1);
         }
 
         if loc.y() == 0 {
-            light = light.max(self.get(Axis::Y, Sign::Negative).light_local[loc.ux()][c::CHUNK_Y_BLOCKS - 1][loc.uz()] as i8 - 1);
+            light = light.max(
+                self.get(Axis::Y, Sign::Negative).light_sky[loc.ux()][c::CHUNK_Y_BLOCKS - 1]
+                    [loc.uz()] as i8
+                    - 1,
+            );
         }
 
         if loc.y() == c::CHUNK_Y_BLOCKS as isize - 1 {
-            // Not stubtracting 1 here because sky light level doesn't decrease when going down
-            light = light.max(self.get(Axis::Y, Sign::Positive).light_local[loc.ux()][0][loc.uz()] as i8);
+            // Not stubtracting 1 here because sky light level doesn't decrease when going
+            // down
+            light =
+                light.max(self.get(Axis::Y, Sign::Positive).light_sky[loc.ux()][0][loc.uz()] as i8);
         }
 
         if loc.z() == 0 {
-            light = light.max(self.get(Axis::Z, Sign::Negative).light_local[loc.ux()][loc.uy()][c::CHUNK_Z_BLOCKS - 1] as i8 - 1);
+            light = light.max(
+                self.get(Axis::Z, Sign::Negative).light_sky[loc.ux()][loc.uy()]
+                    [c::CHUNK_Z_BLOCKS - 1] as i8
+                    - 1,
+            );
         }
 
         if loc.z() == c::CHUNK_Z_BLOCKS as isize - 1 {
-            light = light.max(self.get(Axis::Z, Sign::Positive).light_local[loc.ux()][loc.uy()][0] as i8 - 1);
+            light = light
+                .max(self.get(Axis::Z, Sign::Positive).light_sky[loc.ux()][loc.uy()][0] as i8 - 1);
         }
 
         light as u8
@@ -139,7 +171,8 @@ impl Default for Chunk {
     fn default() -> Self {
         Self {
             blocks: [[[Block::air(); c::CHUNK_Z_BLOCKS]; c::CHUNK_Y_BLOCKS]; c::CHUNK_X_BLOCKS],
-            light_sky: [[[15; c::CHUNK_Z_BLOCKS]; c::CHUNK_Y_BLOCKS]; c::CHUNK_X_BLOCKS],
+            light_sky: [[[c::LIGHT_MAX as u8; c::CHUNK_Z_BLOCKS]; c::CHUNK_Y_BLOCKS];
+                c::CHUNK_X_BLOCKS],
             light_local: [[[0; c::CHUNK_Z_BLOCKS]; c::CHUNK_Y_BLOCKS]; c::CHUNK_X_BLOCKS],
             light_sources: HashSet::new(),
         }
@@ -172,30 +205,26 @@ impl Chunk {
 
     #[instrument(skip_all)]
     fn recalculate_light_sky(&mut self, around: SurroundingChunks) {
+        let mut updated = VecDeque::<t::PointIntLocal>::new();
+
+        // Collect light data from surrounding chunks and populate the queue
         for x in 0..c::CHUNK_X_BLOCKS {
             for y in 0..c::CHUNK_Y_BLOCKS {
                 for z in 0..c::CHUNK_Z_BLOCKS {
-                    if self.blocks[x][y][z].kind == BlockKind::Air {
+                    if self.blocks[x][y][z].is_transparent() {
                         self.light_sky[x][y][z] = around.inner_light_sky([x, y, z].into());
                     } else {
                         self.light_sky[x][y][z] = 0;
+                    }
+
+                    if self.light_sky[x][y][z] != 0 {
+                        updated.push_back([x, y, z].into());
                     }
                 }
             }
         }
 
-        let mut queue = VecDeque::<t::PointIntLocal>::new();
-
-        for x in 0..c::CHUNK_X_BLOCKS {
-            for z in 0..c::CHUNK_Z_BLOCKS {
-                let loc = [x, c::CHUNK_Y_BLOCKS - 2, z].into();
-                if self.get_block(loc).kind == BlockKind::Air {
-                    queue.push_back(loc);
-                }
-            }
-        }
-
-        while let Some(loc) = queue.pop_front() {
+        while let Some(loc) = updated.pop_front() {
             let light = self.light_sky[loc.ux()][loc.uy()][loc.uz()];
             if light == 0 {
                 continue;
@@ -207,17 +236,17 @@ impl Chunk {
                     // Location is outside of the chunk boundaries
                     continue;
                 }
-                if self.get_block(loc2).kind != BlockKind::Air {
-                    // The block is not air
+                if !self.get_block(loc2).is_transparent() {
+                    // The block is not transparent, so light cannot pass through it
                     continue;
                 }
                 let light2 = &mut self.light_sky[loc2.ux()][loc2.uy()][loc2.uz()];
                 if *light2 < light && loc2.y() < loc.y() {
                     *light2 = light;
-                    queue.push_back(loc2);
+                    updated.push_back(loc2);
                 } else if *light2 < light - 1 {
                     *light2 = light - 1;
-                    queue.push_back(loc2);
+                    updated.push_back(loc2);
                 }
             }
         }
@@ -225,13 +254,20 @@ impl Chunk {
 
     #[instrument(skip_all)]
     fn recalculate_light_local(&mut self, around: SurroundingChunks) {
+        let mut updated = VecDeque::<t::PointIntLocal>::new();
+
+        // Collect light data from the surrounding chunks and populate the queue
         for x in 0..c::CHUNK_X_BLOCKS {
             for y in 0..c::CHUNK_Y_BLOCKS {
                 for z in 0..c::CHUNK_Z_BLOCKS {
-                    if self.blocks[x][y][z].kind == BlockKind::Air {
+                    if self.blocks[x][y][z].is_transparent() {
                         self.light_local[x][y][z] = around.inner_light_local([x, y, z].into());
                     } else {
                         self.light_local[x][y][z] = 0;
+                    }
+
+                    if self.light_local[x][y][z] != 0 {
+                        updated.push_back([x, y, z].into());
                     }
                 }
             }
@@ -242,29 +278,13 @@ impl Chunk {
             match block.kind {
                 BlockKind::Light { brightness } => {
                     self.light_local[s.ux()][s.uy()][s.uz()] = brightness;
+                    updated.push_back(*s);
                 },
                 _ => panic!("Light source is not a light block"),
             }
         }
 
-        let mut queue = VecDeque::<t::PointIntLocal>::new();
-
-        queue.extend(self.light_sources.iter());
-
-        for x in 0..c::CHUNK_X_BLOCKS {
-            for y in 0..c::CHUNK_Y_BLOCKS {
-                for z in 0..c::CHUNK_Z_BLOCKS {
-                    let loc: t::PointIntLocal = [x, y, z].into();
-                    if loc.is_on_chunk_face() {
-                        if self.get_block(loc).kind == BlockKind::Air {
-                            queue.push_back(loc);
-                        }
-                    }
-                }
-            }
-        }
-
-        while let Some(loc) = queue.pop_front() {
+        while let Some(loc) = updated.pop_front() {
             let light = self.light_local[loc.ux()][loc.uy()][loc.uz()];
             if light == 0 {
                 continue;
@@ -276,14 +296,14 @@ impl Chunk {
                     // Location is outside of the chunk boundaries
                     continue;
                 }
-                if self.get_block(loc2).kind != BlockKind::Air {
+                if !self.get_block(loc2).is_transparent() {
                     // The block is not air
                     continue;
                 }
                 let light2 = &mut self.light_local[loc2.ux()][loc2.uy()][loc2.uz()];
                 if *light2 < light - 1 {
                     *light2 = light - 1;
-                    queue.push_back(loc2);
+                    updated.push_back(loc2);
                 }
             }
         }
@@ -308,21 +328,16 @@ impl Chunk {
                     let offset = Vector3::new(fx, fy, fz);
                     let block = self.get_block(loc);
                     if block.kind == BlockKind::Solid {
-                        faces.extend(
-                            c::BLOCK_FACES
-                                .iter()
-                                .enumerate()
-                                .map(|(i, face)| {
-                                    let loc2 = loc + &c::ADJACENCY[i];
-                                    let light = if loc2.is_in_chunk() {
-                                        self.get_light(loc2)
-                                    } else {
-                                        1
-                                    };
+                        faces.extend(c::BLOCK_FACES.iter().enumerate().map(|(i, face)| {
+                            let loc2 = loc + &c::ADJACENCY[i];
+                            let light = if loc2.is_in_chunk() {
+                                self.get_light(loc2)
+                            } else {
+                                1
+                            };
 
-                                    (face.map(|p| p + offset), light)
-                                })
-                        );
+                            (face.map(|p| p + offset), light)
+                        }));
                     }
                 }
             }
@@ -385,7 +400,12 @@ mod tests {
         #[test]
         fn one() {
             let mut chunk = Chunk::default();
-            chunk.set_block([0isize, 0, 0], Block { kind: BlockKind::Solid });
+            chunk.set_block(
+                [0isize, 0, 0],
+                Block {
+                    kind: BlockKind::Solid,
+                },
+            );
 
             let ts = chunk.assemble_faces_with_light();
 
@@ -395,8 +415,18 @@ mod tests {
         #[test]
         fn two() {
             let mut chunk = Chunk::default();
-            chunk.set_block([0isize, 0, 0], Block { kind: BlockKind::Solid });
-            chunk.set_block([0isize, 0, 1], Block { kind: BlockKind::Solid });
+            chunk.set_block(
+                [0isize, 0, 0],
+                Block {
+                    kind: BlockKind::Solid,
+                },
+            );
+            chunk.set_block(
+                [0isize, 0, 1],
+                Block {
+                    kind: BlockKind::Solid,
+                },
+            );
 
             let ts = chunk.assemble_faces_with_light();
 

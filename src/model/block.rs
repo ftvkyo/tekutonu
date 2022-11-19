@@ -4,13 +4,10 @@ pub type LightLevel = u8;
 pub enum BlockKind {
     Air,
     Solid,
-    Light {
-        brightness: LightLevel,
-    },
+    Light { brightness: LightLevel },
 }
 
-impl BlockKind {
-}
+impl BlockKind {}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Block {
@@ -20,21 +17,27 @@ pub struct Block {
 impl Block {
     pub fn air() -> Self {
         Self {
-            kind: BlockKind::Air
+            kind: BlockKind::Air,
         }
     }
 
     pub fn solid() -> Self {
         Self {
-            kind: BlockKind::Solid
+            kind: BlockKind::Solid,
         }
     }
 
     pub fn light_source() -> Self {
         Self {
-            kind: BlockKind::Light {
-                brightness: 15
-            }
+            kind: BlockKind::Light { brightness: 15 },
+        }
+    }
+
+    pub fn is_transparent(&self) -> bool {
+        match self.kind {
+            BlockKind::Air => true,
+            BlockKind::Solid => false,
+            BlockKind::Light { .. } => false,
         }
     }
 }

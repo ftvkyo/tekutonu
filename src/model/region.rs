@@ -1,6 +1,9 @@
 use tracing::instrument;
 
-use super::{chunk::{Chunk, SurroundingChunks}, consts as c};
+use super::{
+    chunk::{Chunk, SurroundingChunks},
+    consts as c,
+};
 
 
 pub struct Region {
@@ -20,11 +23,17 @@ impl Region {
     pub fn recalculate_chunk_light(&mut self, loc: impl Into<[usize; 3]>) {
         let loc = loc.into();
 
-        if loc[0] == 0 || loc[0] >= c::REGION_X_CHUNKS
-            || loc[1] == 0 || loc[1] >= c::REGION_Y_CHUNKS
-            || loc[2] == 0 || loc[2] >= c::REGION_Z_CHUNKS
+        if loc[0] == 0
+            || loc[0] >= c::REGION_X_CHUNKS
+            || loc[1] == 0
+            || loc[1] >= c::REGION_Y_CHUNKS
+            || loc[2] == 0
+            || loc[2] >= c::REGION_Z_CHUNKS
         {
-            panic!("Can't recalculate light for a chunk on a face of the region: {:?}", loc);
+            panic!(
+                "Can't recalculate light for a chunk on a face of the region: {:?}",
+                loc
+            );
         }
 
         let surrounding = SurroundingChunks::new([
