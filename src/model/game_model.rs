@@ -2,7 +2,7 @@ use cgmath::{InnerSpace, Matrix4, Point3, Rad, Vector3};
 use tracing::instrument;
 
 use super::{block::Block, chunk::Chunk, consts, effect::GameModelEffect, region::Region};
-use crate::util::{normalize_angle, limit_yaw};
+use crate::util::{limit_yaw, normalize_angle};
 
 pub struct Camera {
     /// Y is up, opposite to vulkan

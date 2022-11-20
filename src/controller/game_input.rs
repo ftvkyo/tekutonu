@@ -1,6 +1,6 @@
 use std::{collections::HashSet, f64::consts::FRAC_PI_2};
 
-use cgmath::{Rad, Vector3, Zero, Point3};
+use cgmath::{Point3, Rad, Vector3, Zero};
 use winit::{
     event::{ElementState, VirtualKeyCode},
     event_loop::ControlFlow,

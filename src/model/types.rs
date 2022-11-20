@@ -2,7 +2,7 @@ use std::ops::Add;
 
 use super::consts as c;
 
-
+// TODO: refactor needed
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PointIntLocal(pub [isize; 3]);
 
@@ -34,7 +34,31 @@ impl PointIntLocal {
     pub fn uz(&self) -> usize {
         self.0[2].try_into().unwrap()
     }
+}
 
+impl PointIntLocal {
+    pub fn with_x(&self, x: isize) -> Self {
+        Self([x, self.y(), self.z()])
+    }
+
+    pub fn with_y(&self, y: isize) -> Self {
+        Self([self.x(), y, self.z()])
+    }
+
+    pub fn with_z(&self, z: isize) -> Self {
+        Self([self.x(), self.y(), z])
+    }
+
+    pub fn localize(&self) -> Self {
+        let [x, y, z] = self.0;
+        let x = x.rem_euclid(c::CHUNK_X_BLOCKS as isize);
+        let y = y.rem_euclid(c::CHUNK_Y_BLOCKS as isize);
+        let z = z.rem_euclid(c::CHUNK_Z_BLOCKS as isize);
+        Self([x, y, z])
+    }
+}
+
+impl PointIntLocal {
     pub fn is_on_chunk_face(&self) -> bool {
         self.x() == 0
             || self.x() == c::CHUNK_X_BLOCKS as isize - 1
