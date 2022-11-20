@@ -12,23 +12,58 @@ use super::{
 type ChunkBlockData<Data> = [[[Data; c::CHUNK_Z_BLOCKS]; c::CHUNK_Y_BLOCKS]; c::CHUNK_X_BLOCKS];
 
 
-pub enum Axis {
-    X,
-    Y,
-    Z,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AdjacentDirection {
+    XPos = 0,
+    XNeg,
+    YPos,
+    YNeg,
+    ZPos,
+    ZNeg,
 }
 
-pub enum Sign {
-    Positive,
-    Negative,
+impl From<t::PointIntLocal> for AdjacentDirection {
+    fn from(loc: t::PointIntLocal) -> Self {
+        let x_pos = loc.x() >= c::CHUNK_X_BLOCKS as isize;
+        let x_neg = loc.x() < 0;
+        let y_pos = loc.y() >= c::CHUNK_Y_BLOCKS as isize;
+        let y_neg = loc.y() < 0;
+        let z_pos = loc.z() >= c::CHUNK_Z_BLOCKS as isize;
+        let z_neg = loc.z() < 0;
+
+        match (x_pos, x_neg, y_pos, y_neg, z_pos, z_neg) {
+            (true, false, false, false, false, false) => Self::XPos,
+            (false, true, false, false, false, false) => Self::XNeg,
+            (false, false, true, false, false, false) => Self::YPos,
+            (false, false, false, true, false, false) => Self::YNeg,
+            (false, false, false, false, true, false) => Self::ZPos,
+            (false, false, false, false, false, true) => Self::ZNeg,
+            _ => panic!("Location is not in an adjacent chunk: {:?}", loc),
+        }
+    }
 }
 
 
 pub trait ChunkAdjacent {
+    /// Trait methods should make sure the locaton is valid.
+    fn assert_location_valid(loc: t::PointIntLocal)
+    where
+        Self: Sized,
+    {
+        debug_assert!(
+            loc.is_on_chunk_face(),
+            "Location {} is not on chunk face",
+            loc
+        );
+    }
+
+    /// Acquire the block at `loc`
     fn get_block(&self, loc: t::PointIntLocal) -> &Block;
 
+    /// Acquire the local light level at `loc`
     fn get_light_local(&self, loc: t::PointIntLocal) -> u8;
 
+    /// Acquire the sky light level at `loc`
     fn get_light_sky(&self, loc: t::PointIntLocal) -> u8;
 }
 
@@ -50,30 +85,36 @@ impl ChunkEmpty {
 }
 
 impl ChunkAdjacent for ChunkEmpty {
-    fn get_block(&self, _loc: t::PointIntLocal) -> &Block {
+    fn get_block(&self, loc: t::PointIntLocal) -> &Block {
+        Self::assert_location_valid(loc);
         &self.only_block
     }
 
-    fn get_light_local(&self, _loc: t::PointIntLocal) -> u8 {
+    fn get_light_local(&self, loc: t::PointIntLocal) -> u8 {
+        Self::assert_location_valid(loc);
         self.light_local
     }
 
-    fn get_light_sky(&self, _loc: t::PointIntLocal) -> u8 {
+    fn get_light_sky(&self, loc: t::PointIntLocal) -> u8 {
+        Self::assert_location_valid(loc);
         self.light_sky
     }
 }
 
 impl ChunkAdjacent for Chunk {
     fn get_block(&self, loc: t::PointIntLocal) -> &Block {
+        Self::assert_location_valid(loc);
         self.get_block(loc)
     }
 
     fn get_light_local(&self, loc: t::PointIntLocal) -> u8 {
-        self.light_local[loc.ux()][loc.uy()][loc.uz()]
+        Self::assert_location_valid(loc);
+        self.get_light_local(loc)
     }
 
     fn get_light_sky(&self, loc: t::PointIntLocal) -> u8 {
-        self.light_sky[loc.ux()][loc.uy()][loc.uz()]
+        Self::assert_location_valid(loc);
+        self.get_light_sky(loc)
     }
 }
 
@@ -88,16 +129,16 @@ impl<'a> SurroundingChunks<'a> {
         Self { chunks }
     }
 
-    pub fn get(&self, axis: Axis, sign: Sign) -> &'a dyn ChunkAdjacent {
-        let index = match (axis, sign) {
-            (Axis::X, Sign::Positive) => 0,
-            (Axis::X, Sign::Negative) => 1,
-            (Axis::Y, Sign::Positive) => 2,
-            (Axis::Y, Sign::Negative) => 3,
-            (Axis::Z, Sign::Positive) => 4,
-            (Axis::Z, Sign::Negative) => 5,
-        };
-        self.chunks[index]
+    pub fn get_chunk_for_direction(&self, direction: &AdjacentDirection) -> &'a dyn ChunkAdjacent {
+        self.chunks[*direction as usize]
+    }
+
+    pub fn get_chunk_of_location(
+        &self,
+        loc: t::PointIntLocal,
+    ) -> (&'a dyn ChunkAdjacent, AdjacentDirection) {
+        let direction = AdjacentDirection::from(loc);
+        (self.get_chunk_for_direction(&direction), direction)
     }
 
     /// Get local light level for a location on one of inner chunk's faces based
@@ -108,60 +149,22 @@ impl<'a> SurroundingChunks<'a> {
     ///
     /// For blocks that are not on the inner chunk's faces, return 0.
     pub fn inner_light_local(&self, loc: t::PointIntLocal) -> u8 {
+        if !loc.is_on_chunk_face() {
+            return 0;
+        }
+
         let mut light = 0;
 
-        if loc.x() == 0 {
-            light = light.max(
-                self.get(Axis::X, Sign::Negative)
-                    .get_light_local(loc.with_x(c::CHUNK_X_BLOCKS as isize - 1))
-                    as i8
-                    - 1,
-            );
+        for adjacent in c::ADJACENCY {
+            let loc_adjacent = loc + &adjacent;
+            if !loc_adjacent.is_in_chunk() {
+                let (chunk_adjacent, _) = self.get_chunk_of_location(loc_adjacent);
+                let light_adjacent = chunk_adjacent.get_light_local(loc_adjacent.localize());
+                light = light_adjacent.max(light + 1) - 1;
+            }
         }
 
-        if loc.x() == c::CHUNK_X_BLOCKS as isize - 1 {
-            light = light.max(
-                self.get(Axis::X, Sign::Positive)
-                    .get_light_local(loc.with_x(0)) as i8
-                    - 1,
-            );
-        }
-
-        if loc.y() == 0 {
-            light = light.max(
-                self.get(Axis::Y, Sign::Negative)
-                    .get_light_local(loc.with_y(c::CHUNK_Y_BLOCKS as isize - 1))
-                    as i8
-                    - 1,
-            );
-        }
-
-        if loc.y() == c::CHUNK_Y_BLOCKS as isize - 1 {
-            light = light.max(
-                self.get(Axis::Y, Sign::Positive)
-                    .get_light_local(loc.with_y(0)) as i8
-                    - 1,
-            );
-        }
-
-        if loc.z() == 0 {
-            light = light.max(
-                self.get(Axis::Z, Sign::Negative)
-                    .get_light_local(loc.with_z(c::CHUNK_Z_BLOCKS as isize - 1))
-                    as i8
-                    - 1,
-            );
-        }
-
-        if loc.z() == c::CHUNK_Z_BLOCKS as isize - 1 {
-            light = light.max(
-                self.get(Axis::Z, Sign::Positive)
-                    .get_light_local(loc.with_z(0)) as i8
-                    - 1,
-            );
-        }
-
-        light as u8
+        light
     }
 
     /// Get sky light level for a location on one of the inner chunk's faces
@@ -174,61 +177,27 @@ impl<'a> SurroundingChunks<'a> {
     ///
     /// For blocks that are not on the inner chunk's faces, return 0.
     pub fn inner_light_sky(&self, loc: t::PointIntLocal) -> u8 {
+        if !loc.is_on_chunk_face() {
+            return 0;
+        }
+
         let mut light = 0;
 
-        if loc.x() == 0 {
-            light = light.max(
-                self.get(Axis::X, Sign::Negative)
-                    .get_light_sky(loc.with_x(c::CHUNK_X_BLOCKS as isize - 1))
-                    as i8
-                    - 1,
-            );
+        for adjacent in c::ADJACENCY {
+            let loc_adjacent = loc + &adjacent;
+            if !loc_adjacent.is_in_chunk() {
+                let (chunk_adjacent, direction) = self.get_chunk_of_location(loc_adjacent);
+                let light_adjacent = chunk_adjacent.get_light_sky(loc_adjacent.localize());
+
+                if direction == AdjacentDirection::YPos {
+                    light = light_adjacent.max(light);
+                } else {
+                    light = light_adjacent.max(light + 1) - 1;
+                }
+            }
         }
 
-        if loc.x() == c::CHUNK_X_BLOCKS as isize - 1 {
-            light = light.max(
-                self.get(Axis::X, Sign::Negative)
-                    .get_light_sky(loc.with_x(0)) as i8
-                    - 1,
-            );
-        }
-
-        if loc.y() == 0 {
-            light = light.max(
-                self.get(Axis::Y, Sign::Negative)
-                    .get_light_sky(loc.with_y(c::CHUNK_Y_BLOCKS as isize - 1))
-                    as i8
-                    - 1,
-            );
-        }
-
-        if loc.y() == c::CHUNK_Y_BLOCKS as isize - 1 {
-            // Not stubtracting 1 here because sky light level doesn't decrease when going
-            // down
-            light = light.max(
-                self.get(Axis::X, Sign::Negative)
-                    .get_light_sky(loc.with_y(0)) as i8,
-            );
-        }
-
-        if loc.z() == 0 {
-            light = light.max(
-                self.get(Axis::X, Sign::Negative)
-                    .get_light_sky(loc.with_z(c::CHUNK_Z_BLOCKS as isize - 1))
-                    as i8
-                    - 1,
-            );
-        }
-
-        if loc.z() == c::CHUNK_Z_BLOCKS as isize - 1 {
-            light = light.max(
-                self.get(Axis::Z, Sign::Positive)
-                    .get_light_sky(loc.with_z(0)) as i8
-                    - 1,
-            );
-        }
-
-        light as u8
+        light
     }
 }
 
@@ -271,10 +240,14 @@ impl Chunk {
         }
     }
 
-    pub fn get_light(&self, loc: impl Into<t::PointIntLocal>) -> u8 {
+    pub fn get_light_local(&self, loc: impl Into<t::PointIntLocal>) -> u8 {
         let loc = loc.into();
         self.light_local[loc.ux()][loc.uy()][loc.uz()]
-            .max(self.light_sky[loc.ux()][loc.uy()][loc.uz()])
+    }
+
+    pub fn get_light_sky(&self, loc: impl Into<t::PointIntLocal>) -> u8 {
+        let loc = loc.into();
+        self.light_sky[loc.ux()][loc.uy()][loc.uz()]
     }
 
     #[instrument(skip_all)]
@@ -412,9 +385,11 @@ impl Chunk {
                                     return None;
                                 }
 
-                                self.get_light(loc2)
+                                let local = self.get_light_local(loc2);
+                                let sky = self.get_light_sky(loc2);
+                                sky.max(local)
                             } else {
-                                1
+                                0
                             };
 
                             Some((face.map(|p| p + offset), light))

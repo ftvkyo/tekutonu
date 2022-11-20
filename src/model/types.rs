@@ -2,7 +2,7 @@ use std::ops::Add;
 
 use super::consts as c;
 
-
+// TODO: refactor needed
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PointIntLocal(pub [isize; 3]);
 
@@ -47,6 +47,14 @@ impl PointIntLocal {
 
     pub fn with_z(&self, z: isize) -> Self {
         Self([self.x(), self.y(), z])
+    }
+
+    pub fn localize(&self) -> Self {
+        let [x, y, z] = self.0;
+        let x = x.rem_euclid(c::CHUNK_X_BLOCKS as isize);
+        let y = y.rem_euclid(c::CHUNK_Y_BLOCKS as isize);
+        let z = z.rem_euclid(c::CHUNK_Z_BLOCKS as isize);
+        Self([x, y, z])
     }
 }
 
