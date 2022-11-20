@@ -34,7 +34,23 @@ impl PointIntLocal {
     pub fn uz(&self) -> usize {
         self.0[2].try_into().unwrap()
     }
+}
 
+impl PointIntLocal {
+    pub fn with_x(&self, x: isize) -> Self {
+        Self([x, self.y(), self.z()])
+    }
+
+    pub fn with_y(&self, y: isize) -> Self {
+        Self([self.x(), y, self.z()])
+    }
+
+    pub fn with_z(&self, z: isize) -> Self {
+        Self([self.x(), self.y(), z])
+    }
+}
+
+impl PointIntLocal {
     pub fn is_on_chunk_face(&self) -> bool {
         self.x() == 0
             || self.x() == c::CHUNK_X_BLOCKS as isize - 1

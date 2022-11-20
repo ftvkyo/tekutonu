@@ -24,17 +24,71 @@ pub enum Sign {
 }
 
 
+pub trait ChunkAdjacent {
+    fn get_block(&self, loc: t::PointIntLocal) -> &Block;
+
+    fn get_light_local(&self, loc: t::PointIntLocal) -> u8;
+
+    fn get_light_sky(&self, loc: t::PointIntLocal) -> u8;
+}
+
+
+pub struct ChunkEmpty {
+    only_block: Block,
+    light_local: u8,
+    light_sky: u8,
+}
+
+impl ChunkEmpty {
+    pub fn new(light_sky: u8) -> Self {
+        Self {
+            only_block: Block::air(),
+            light_local: 0,
+            light_sky,
+        }
+    }
+}
+
+impl ChunkAdjacent for ChunkEmpty {
+    fn get_block(&self, _loc: t::PointIntLocal) -> &Block {
+        &self.only_block
+    }
+
+    fn get_light_local(&self, _loc: t::PointIntLocal) -> u8 {
+        self.light_local
+    }
+
+    fn get_light_sky(&self, _loc: t::PointIntLocal) -> u8 {
+        self.light_sky
+    }
+}
+
+impl ChunkAdjacent for Chunk {
+    fn get_block(&self, loc: t::PointIntLocal) -> &Block {
+        self.get_block(loc)
+    }
+
+    fn get_light_local(&self, loc: t::PointIntLocal) -> u8 {
+        self.light_local[loc.ux()][loc.uy()][loc.uz()]
+    }
+
+    fn get_light_sky(&self, loc: t::PointIntLocal) -> u8 {
+        self.light_sky[loc.ux()][loc.uy()][loc.uz()]
+    }
+}
+
+
 #[derive(Clone, Copy)]
 pub struct SurroundingChunks<'a> {
-    chunks: [&'a Chunk; 6],
+    chunks: [&'a dyn ChunkAdjacent; 6],
 }
 
 impl<'a> SurroundingChunks<'a> {
-    pub fn new(chunks: [&'a Chunk; 6]) -> Self {
+    pub fn new(chunks: [&'a dyn ChunkAdjacent; 6]) -> Self {
         Self { chunks }
     }
 
-    pub fn get(&self, axis: Axis, sign: Sign) -> &'a Chunk {
+    pub fn get(&self, axis: Axis, sign: Sign) -> &'a dyn ChunkAdjacent {
         let index = match (axis, sign) {
             (Axis::X, Sign::Positive) => 0,
             (Axis::X, Sign::Negative) => 1,
@@ -58,43 +112,52 @@ impl<'a> SurroundingChunks<'a> {
 
         if loc.x() == 0 {
             light = light.max(
-                self.get(Axis::X, Sign::Negative).light_local[c::CHUNK_X_BLOCKS - 1][loc.uy()]
-                    [loc.uz()] as i8
+                self.get(Axis::X, Sign::Negative)
+                    .get_light_local(loc.with_x(c::CHUNK_X_BLOCKS as isize - 1))
+                    as i8
                     - 1,
             );
         }
 
         if loc.x() == c::CHUNK_X_BLOCKS as isize - 1 {
             light = light.max(
-                self.get(Axis::X, Sign::Positive).light_local[0][loc.uy()][loc.uz()] as i8 - 1,
+                self.get(Axis::X, Sign::Positive)
+                    .get_light_local(loc.with_x(0)) as i8
+                    - 1,
             );
         }
 
         if loc.y() == 0 {
             light = light.max(
-                self.get(Axis::Y, Sign::Negative).light_local[loc.ux()][c::CHUNK_Y_BLOCKS - 1]
-                    [loc.uz()] as i8
+                self.get(Axis::Y, Sign::Negative)
+                    .get_light_local(loc.with_y(c::CHUNK_Y_BLOCKS as isize - 1))
+                    as i8
                     - 1,
             );
         }
 
         if loc.y() == c::CHUNK_Y_BLOCKS as isize - 1 {
             light = light.max(
-                self.get(Axis::Y, Sign::Positive).light_local[loc.ux()][0][loc.uz()] as i8 - 1,
+                self.get(Axis::Y, Sign::Positive)
+                    .get_light_local(loc.with_y(0)) as i8
+                    - 1,
             );
         }
 
         if loc.z() == 0 {
             light = light.max(
-                self.get(Axis::Z, Sign::Negative).light_local[loc.ux()][loc.uy()]
-                    [c::CHUNK_Z_BLOCKS - 1] as i8
+                self.get(Axis::Z, Sign::Negative)
+                    .get_light_local(loc.with_z(c::CHUNK_Z_BLOCKS as isize - 1))
+                    as i8
                     - 1,
             );
         }
 
         if loc.z() == c::CHUNK_Z_BLOCKS as isize - 1 {
             light = light.max(
-                self.get(Axis::Z, Sign::Positive).light_local[loc.ux()][loc.uy()][0] as i8 - 1,
+                self.get(Axis::Z, Sign::Positive)
+                    .get_light_local(loc.with_z(0)) as i8
+                    - 1,
             );
         }
 
@@ -115,21 +178,26 @@ impl<'a> SurroundingChunks<'a> {
 
         if loc.x() == 0 {
             light = light.max(
-                self.get(Axis::X, Sign::Negative).light_sky[c::CHUNK_X_BLOCKS - 1][loc.uy()]
-                    [loc.uz()] as i8
+                self.get(Axis::X, Sign::Negative)
+                    .get_light_sky(loc.with_x(c::CHUNK_X_BLOCKS as isize - 1))
+                    as i8
                     - 1,
             );
         }
 
         if loc.x() == c::CHUNK_X_BLOCKS as isize - 1 {
-            light = light
-                .max(self.get(Axis::X, Sign::Positive).light_sky[0][loc.uy()][loc.uz()] as i8 - 1);
+            light = light.max(
+                self.get(Axis::X, Sign::Negative)
+                    .get_light_sky(loc.with_x(0)) as i8
+                    - 1,
+            );
         }
 
         if loc.y() == 0 {
             light = light.max(
-                self.get(Axis::Y, Sign::Negative).light_sky[loc.ux()][c::CHUNK_Y_BLOCKS - 1]
-                    [loc.uz()] as i8
+                self.get(Axis::Y, Sign::Negative)
+                    .get_light_sky(loc.with_y(c::CHUNK_Y_BLOCKS as isize - 1))
+                    as i8
                     - 1,
             );
         }
@@ -137,21 +205,27 @@ impl<'a> SurroundingChunks<'a> {
         if loc.y() == c::CHUNK_Y_BLOCKS as isize - 1 {
             // Not stubtracting 1 here because sky light level doesn't decrease when going
             // down
-            light =
-                light.max(self.get(Axis::Y, Sign::Positive).light_sky[loc.ux()][0][loc.uz()] as i8);
+            light = light.max(
+                self.get(Axis::X, Sign::Negative)
+                    .get_light_sky(loc.with_y(0)) as i8,
+            );
         }
 
         if loc.z() == 0 {
             light = light.max(
-                self.get(Axis::Z, Sign::Negative).light_sky[loc.ux()][loc.uy()]
-                    [c::CHUNK_Z_BLOCKS - 1] as i8
+                self.get(Axis::X, Sign::Negative)
+                    .get_light_sky(loc.with_z(c::CHUNK_Z_BLOCKS as isize - 1))
+                    as i8
                     - 1,
             );
         }
 
         if loc.z() == c::CHUNK_Z_BLOCKS as isize - 1 {
-            light = light
-                .max(self.get(Axis::Z, Sign::Positive).light_sky[loc.ux()][loc.uy()][0] as i8 - 1);
+            light = light.max(
+                self.get(Axis::Z, Sign::Positive)
+                    .get_light_sky(loc.with_z(0)) as i8
+                    - 1,
+            );
         }
 
         light as u8
