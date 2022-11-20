@@ -131,8 +131,8 @@ impl Default for GameModel {
             }
         }
 
-        world.set_chunk([1, 1, 1], c);
-        world.recalculate_chunk_light([1, 1, 1]);
+        world.set_chunk([1isize, 1, 1], c);
+        world.recalculate_chunk_light([1isize, 1, 1]);
 
         Self {
             camera: Default::default(),

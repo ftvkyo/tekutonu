@@ -343,7 +343,6 @@ impl Renderer {
     fn make_vli(&self, game: &GameModel) -> Vni {
         let (v, l, i) = game
             .world
-            .get_chunk([1, 1, 1])
             .get_render_data(Vector3::new(0.0, 0.0, 0.0));
 
         let v = CpuAccessibleBuffer::from_iter(
